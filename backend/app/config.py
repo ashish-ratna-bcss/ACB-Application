@@ -22,7 +22,7 @@ AI_BATCH_MAX_PAGES = 3
 AI_BATCH_MAX_WORDS = 3000
 
 # Ollama
-OLLAMA_URL = "http://localhost:11434"
+OLLAMA_URL = os.getenv("OLLAMA_URL", "http://localhost:11434")
 OLLAMA_CHAT_MODEL = "qwen2.5:3b"            # Subdoc detection (fast, sufficient for detection)
 OLLAMA_EXTRACT_MODEL = "qwen2.5:3b"         # Content extraction (faster, sufficient for extraction)
 OLLAMA_DRAFT_MODEL = "qwen2.5:3b"           # Draft generation (GPU-friendly)
