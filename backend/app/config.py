@@ -10,10 +10,8 @@ DATABASE_URL = f"sqlite:///{BASE_DIR / 'acb_documents.db'}"
 MAX_FILE_SIZE_MB = 300
 ALLOWED_CONTENT_TYPE = "application/pdf"
 
-POPPLER_PATH = r"C:\Poppler\Release-26.02.0-0\poppler-26.02.0\Library\bin"
+POPPLER_PATH = os.getenv("POPPLER_PATH", r"C:\Poppler\Release-26.02.0-0\poppler-26.02.0\Library\bin" if os.name == "nt" else "")
 
-# Inject at import time so every subprocess (pdf2image, etc.) can find poppler executables.
-# Must happen before any pdf2image call — doing it here guarantees it runs at server startup.
 if POPPLER_PATH and POPPLER_PATH not in os.environ.get("PATH", ""):
     os.environ["PATH"] = POPPLER_PATH + os.pathsep + os.environ.get("PATH", "")
 
