@@ -1,5 +1,6 @@
 import json
 import logging
+import os
 from datetime import datetime
 
 from app.database import SessionLocal
@@ -70,7 +71,7 @@ def _clear_downstream_data(db, document_id: int, start_stage: str) -> None:
     if stage_idx <= STAGES_LIST.index(STAGE_EMBEDDINGS):
         from qdrant_client import QdrantClient
         try:
-            client = QdrantClient(url="http://localhost:6333")
+            client = QdrantClient(url=os.getenv("QDRANT_URL", "http://localhost:6333"))
             client.delete(
                 collection_name="document_sections",
                 points_selector={"filter": {"must": [{"field": "document_id", "match": {"value": document_id}}]}}
