@@ -9,6 +9,7 @@ from app.models import (
 )
 from app.services.ai_content_extraction import extract_content
 from app.services.ai_subdoc_detection import detect_subdocuments
+from app.services.evidence_extractor import extract_all_evidence, serialize_evidence
 from app.services.ocr import extract_ocr_blocks
 from app.services.page_parser import reconstruct_page_text
 from app.services.pdf_to_images import convert_pdf_to_images, delete_page_images
@@ -290,18 +291,24 @@ def run_pipeline(document_id: int, case_id: str, file_name: str, start_stage: st
                 db.flush()
                 subdoc_ids.append(sd.id)
 
+                # Extract structured evidence from main content
+                main_content = content.get("main_content", "")
+                evidence = extract_all_evidence(main_content)
+                evidence_json = serialize_evidence(evidence)
+
                 db.add(SubDocumentContent(
                     sub_document_id=sd.id,
                     title=content.get("title"),
                     subject=content.get("subject"),
                     purpose=content.get("purpose"),
                     summary=content.get("executive_summary"),
-                    main_content=content.get("main_content"),
+                    main_content=main_content,
                     key_persons=json.dumps(content.get("important_people") or []),
                     key_dates=json.dumps(content.get("important_dates") or []),
                     key_findings=json.dumps(content.get("key_findings") or []),
                     key_actions=json.dumps(content.get("key_actions") or []),
                     organizations=json.dumps(content.get("important_organizations") or []),
+                    evidence_objects=evidence_json,
                 ))
                 set_stage_progress(document_id, STAGE_STORE, i, total_subdocs, "sub-documents")
                 logger.info(f"[doc={document_id}]   Stored sub-doc {i}/{total_subdocs}")
@@ -311,19 +318,41 @@ def run_pipeline(document_id: int, case_id: str, file_name: str, start_stage: st
 
         # ── Step 7: Embeddings ────────────────────────────────────────────────
         if start_idx <= STAGES_LIST.index(STAGE_EMBEDDINGS):
+            # Load from DB if resuming directly at this stage (extracted/subdoc_ids not in memory)
+            if extracted is None or subdoc_ids is None:
+                subdocs_db = db.query(SubDocument).filter(SubDocument.document_id == document_id).all()
+                subdoc_ids = [sd.id for sd in subdocs_db]
+                total_subdocs = len(subdoc_ids)
+                extracted = []
+                for sd in subdocs_db:
+                    c = db.query(SubDocumentContent).filter(
+                        SubDocumentContent.sub_document_id == sd.id
+                    ).first()
+                    subdoc_meta = {
+                        "title": sd.title,
+                        "document_type": sd.document_type,
+                        "start_page": sd.start_page,
+                        "end_page": sd.end_page,
+                    }
+                    content = {
+                        "title": c.title if c else None,
+                        "subject": c.subject if c else None,
+                        "executive_summary": c.summary if c else None,
+                        "main_content": c.main_content if c else "",
+                        "key_findings": json.loads(c.key_findings) if c and c.key_findings else [],
+                        "key_actions": json.loads(c.key_actions) if c and c.key_actions else [],
+                    }
+                    extracted.append((subdoc_meta, content))
+
             _stage(db, doc, "processing", STAGE_EMBEDDINGS)
             set_stage_progress(document_id, STAGE_EMBEDDINGS, 0, total_subdocs, "embeddings")
             logger.info(f"[doc={document_id}] Generating {total_subdocs} embedding(s)")
 
-            try:
-                from app.services.embeddings import store_subdoc_embeddings
-                store_subdoc_embeddings(
-                    extracted, case_id, document_id, subdoc_ids,
-                    progress_callback=lambda i, n: set_stage_progress(document_id, STAGE_EMBEDDINGS, i, n, "embeddings"),
-                )
-            except Exception as exc:
-                logger.warning(f"[doc={document_id}] Embeddings skipped — {exc}")
-
+            from app.services.embeddings import store_subdoc_embeddings
+            store_subdoc_embeddings(
+                extracted, case_id, document_id, subdoc_ids,
+                progress_callback=lambda i, n: set_stage_progress(document_id, STAGE_EMBEDDINGS, i, n, "embeddings"),
+            )
             _mark_stage_completed(db, document_id, STAGE_EMBEDDINGS)
 
         _stage(db, doc, "completed", None)

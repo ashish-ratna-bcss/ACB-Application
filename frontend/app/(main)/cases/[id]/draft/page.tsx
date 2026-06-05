@@ -87,17 +87,57 @@ export default function DraftPage() {
     setSelectedDraft(null);
 
     try {
-      const res = await fetch('/api/draft', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ caseId: id, type: selectedType }),
-      });
-      if (res.ok) {
-        const draft = await res.json();
-        setGeneratedText(draft.content);
-        setSelectedDraft(draft);
-        setDrafts(prev => [draft, ...prev.filter(d => d.id !== draft.id)]);
+      const res = await fetch(`http://localhost:8000/pdf/generate-draft/${id}`);
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.detail || `Server error ${res.status}`);
       }
+      const data = await res.json();
+
+      // Convert structured sections → formatted report text
+      const lines: string[] = [];
+      lines.push(data.title || 'GOVERNMENT OF TELANGANA ANTI-CORRUPTION BUREAU');
+      lines.push('');
+      if (data.header) {
+        lines.push(data.header.from || '');
+        lines.push('');
+        lines.push(data.header.to || '');
+        lines.push('');
+        lines.push('─'.repeat(60));
+        lines.push('');
+      }
+      for (const section of (data.sections || [])) {
+        lines.push(`${section.number}. ${section.heading}`);
+        lines.push('');
+        for (const sub of (section.subsections || [])) {
+          if (sub.heading) lines.push(`  ${sub.number}. ${sub.heading}`);
+          if (sub.content && sub.content !== 'TO DO') {
+            lines.push(`  ${sub.content}`);
+          } else {
+            lines.push(`  [TO BE FILLED]`);
+          }
+          lines.push('');
+        }
+      }
+
+      const content = lines.join('\n');
+      const draft: Draft = {
+        id: `rag-${Date.now()}`,
+        caseId: id,
+        type: 'final_report',
+        title: data.title || 'ACB Final Report',
+        content,
+        status: 'draft',
+        comments: [],
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+
+      setGeneratedText(content);
+      setSelectedDraft(draft);
+      setDrafts(prev => [draft, ...prev]);
+    } catch (err) {
+      alert(`Draft generation failed: ${err instanceof Error ? err.message : 'Unknown error'}`);
     } finally {
       setGenerating(false);
     }

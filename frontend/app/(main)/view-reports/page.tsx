@@ -295,6 +295,8 @@ export default function ViewReportsPage() {
   const [error, setError]               = useState("");
   const [draftLoading, setDraftLoading]   = useState(false);
   const [draft, setDraft]                 = useState<DraftReport | null>(null);
+  const [draftProgress, setDraftProgress] = useState<{current:number;total:number;sections:string[]} | null>(null);
+  const [savedDraftExists, setSavedDraftExists] = useState(false);
   const [reindexing, setReindexing]       = useState(false);
   const [reindexMsg, setReindexMsg]       = useState("");
 
@@ -312,12 +314,29 @@ export default function ViewReportsPage() {
     setDropOpen(false);
     setCaseDetail(null);
     setError("");
+    setSavedDraftExists(false);
     setLoading(true);
     fetch(`http://localhost:8000/pdf/case/${cid}`)
       .then(r => r.json())
       .then(d => setCaseDetail(d))
       .catch(() => setError("Failed to load case details"))
       .finally(() => setLoading(false));
+    // Check if saved draft exists
+    fetch(`http://localhost:8000/pdf/saved-draft/${cid}`, { cache: "no-store" })
+      .then(r => { if (r.ok) setSavedDraftExists(true); })
+      .catch(() => {});
+  }
+
+  async function viewSavedDraft() {
+    if (!selectedCase) return;
+    try {
+      const res = await fetch(`http://localhost:8000/pdf/saved-draft/${selectedCase}`, { cache: "no-store" });
+      if (!res.ok) throw new Error("Not found");
+      const data: DraftReport = await res.json();
+      setDraft(data);
+    } catch {
+      setError("Failed to load saved draft");
+    }
   }
 
   function refresh() {
@@ -343,15 +362,27 @@ export default function ViewReportsPage() {
   async function generateDraft() {
     if (!selectedCase || draftLoading) return;
     setDraftLoading(true);
+    setDraftProgress(null);
+
+    // Poll progress every 2s while generating
+    const pollInterval = setInterval(async () => {
+      try {
+        const p = await fetch(`http://localhost:8000/pdf/draft-progress/${selectedCase}`).then(r => r.json());
+        if (p && p.total) setDraftProgress(p);
+      } catch { /* ignore */ }
+    }, 2000);
+
     try {
-      const res = await fetch(`http://localhost:8000/pdf/generate-draft/${selectedCase}`);
+      const res = await fetch(`http://localhost:8000/pdf/generate-draft/${selectedCase}`, { cache: 'no-store' });
       if (!res.ok) throw new Error("Failed to generate draft");
       const data: DraftReport = await res.json();
       setDraft(data);
     } catch {
       setError("Failed to generate draft report");
     } finally {
+      clearInterval(pollInterval);
       setDraftLoading(false);
+      setDraftProgress(null);
     }
   }
 
@@ -553,6 +584,21 @@ export default function ViewReportsPage() {
                     )}
                   </div>
 
+                  {/* View saved draft button */}
+                  {savedDraftExists && (
+                    <button
+                      onClick={viewSavedDraft}
+                      className="flex items-center gap-2 px-5 py-2 rounded-xl text-sm font-bold transition-all"
+                      style={{
+                        background: "linear-gradient(135deg,#065F46,#059669)",
+                        color: "white",
+                        border: "1px solid rgba(16,185,129,0.4)",
+                      }}
+                    >
+                      <ScrollText size={14} /> View Draft Report
+                    </button>
+                  )}
+
                   {/* Generate Draft Report button */}
                   <button
                     onClick={generateDraft}
@@ -568,7 +614,11 @@ export default function ViewReportsPage() {
                     }}
                   >
                     {draftLoading ? (
-                      <><Loader2 size={14} className="animate-spin" /> Generating…</>
+                      <><Loader2 size={14} className="animate-spin" />
+                        {draftProgress
+                          ? `Group ${draftProgress.current} / ${draftProgress.total}…`
+                          : "Starting…"}
+                      </>
                     ) : (
                       <><ScrollText size={14} /><Sparkles size={12} /> Generate Draft Report</>
                     )}

@@ -24,8 +24,14 @@ interface DraftSection {
 
 export interface DraftReport {
   case_id: string;
-  title: string;
+  office?: string;
+  case_name?: string;
+  date?: string;
+  doc_title?: string;
+  sub?: string;
+  title?: string;
   case_number: string;
+  header?: { from: string; to: string };
   sections: DraftSection[];
 }
 
@@ -40,42 +46,68 @@ function draftToHtml(draft: DraftReport): string {
   const esc = (s: string) =>
     s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
-  const contentHtml = (raw: string) => {
-    if (!raw) return "<p></p>";
+  const contentHtml = (raw: string, heading?: string) => {
+    if (!raw) return `<p><strong style="color:#000000">[TO BE FILLED${heading ? ` — ${esc(heading)}` : ""}]</strong></p>`;
     return raw
       .split("\n")
       .map(line => {
         const escaped = esc(line);
-        if (line === "TO DO") {
-          return `<p><strong style="color:#EF4444">[TO DO]</strong></p>`;
+        if (line.trim() === "TO DO" || line.trim() === "[TO BE FILLED]" || line.trim().startsWith("[NOT IN SOURCE")) {
+          const label = line.trim().startsWith("[NOT IN SOURCE") ? "NOT IN SOURCE" : "TO BE FILLED";
+          return `<p><strong style="color:#000000">[${label}${heading ? ` — ${esc(heading)}` : ""}]</strong></p>`;
         }
         return `<p>${escaped || "&nbsp;"}</p>`;
       })
       .join("");
   };
 
-  let html = `<h1>FORMAT FOR FINAL REPORT IN TRAP CASES</h1>`;
-  html += `<h2>Case No.: ${esc(draft.case_id)}</h2>`;
+  let html = "";
+
+  // Office header
+  if (draft.office) {
+    html += `<p style="text-align:right;line-height:1.8">${esc(draft.office).replace(/\n/g, "<br/>")}</p>`;
+  }
+
+  // Case name + Date row
+  html += `<table width="100%" style="margin:1rem 0"><tr>`;
+  html += `<td style="text-align:left"><strong>${esc(draft.case_name || draft.case_id)}</strong></td>`;
+  html += `<td style="text-align:right"><strong>${esc(draft.date || "")}</strong></td>`;
+  html += `</tr></table>`;
+
+  // Document title
+  html += `<h1 style="text-align:center;text-decoration:underline;font-weight:bold">${esc(draft.doc_title || "CIRCULAR MEMORANDUM")}</h1>`;
+
+  // Sub line
+  if (draft.sub) {
+    html += `<p style="margin:0.8rem 0">${esc(draft.sub).replace(/\t/g, "&nbsp;&nbsp;&nbsp;&nbsp;")}</p>`;
+  }
+
   html += `<hr/>`;
 
   for (const section of draft.sections) {
-    html += `<h2>${esc(section.number)}. ${esc(section.heading)}</h2>`;
+    html += `<h2>${esc(section.heading)}</h2>`;
     for (const sub of section.subsections) {
-      if (sub.heading) {
-        html += `<h3>${esc(sub.number)} ${esc(sub.heading)}</h3>`;
-      }
-      html += contentHtml(sub.content);
+      html += contentHtml(sub.content, sub.heading);
     }
   }
+
+  // Footer
+  html += `<hr/>`;
+  html += `<p>Director General,<br/>Anti-Corruption Bureau,<br/>TG, Hyderabad</p>`;
+  html += `<br/>`;
+  html += `<p><strong>To</strong><br/>All the Dy. Superintendents of Police, ACB, Telangana.<br/>AO (SB), MSB (SB), SB Managers &amp; all the S.B. Assistants.</p>`;
+  html += `<br/>`;
+  html += `<p><strong>Copy to:</strong><br/>The LA and Prl. CLA, ACB, TG, Hyderabad.<br/>Copy to all the Joint Directors/Deputy Directors, ACB, TG, Hyderabad.<br/>Copy to the Peshis of the Director General and the Director, ACB, TG, Hyd.</p>`;
 
   return html;
 }
 
 // ── DOCX export ───────────────────────────────────────────────────────────────
 
-async function exportDocx(draft: DraftReport, editorHtml: string) {
-  const { Document, Paragraph, TextRun, HeadingLevel, Packer, AlignmentType, BorderStyle } = await import("docx");
-  const { saveAs } = await import("file-saver");
+async function exportDocx(draft: DraftReport) {
+  const { Document, Paragraph, TextRun, HeadingLevel, Packer, AlignmentType } = await import("docx");
+  const fileSaver = await import("file-saver");
+  const saveAs = fileSaver.saveAs || (fileSaver as any).default?.saveAs || (fileSaver as any).default;
 
   const children: InstanceType<typeof Paragraph>[] = [];
 
@@ -83,11 +115,11 @@ async function exportDocx(draft: DraftReport, editorHtml: string) {
   children.push(
     new Paragraph({
       alignment: AlignmentType.RIGHT,
-      children: [new TextRun({ text: "Office of the Director General,", size: 20 })],
+      children: [new TextRun({ text: "Office of the Director General,", size: 20, font: "Trebuchet MS" })],
     }),
     new Paragraph({
       alignment: AlignmentType.RIGHT,
-      children: [new TextRun({ text: "Anti-Corruption Bureau, TG, Hyderabad.", size: 20 })],
+      children: [new TextRun({ text: "Anti-Corruption Bureau, TG, Hyderabad.", size: 20, font: "Trebuchet MS" })],
     }),
     new Paragraph({ text: "" }),
   );
@@ -95,7 +127,7 @@ async function exportDocx(draft: DraftReport, editorHtml: string) {
   // Title
   children.push(
     new Paragraph({
-      text: "FORMAT FOR FINAL REPORT IN TRAP CASES",
+      text: draft.title || "GOVERNMENT OF TELANGANA ANTI-CORRUPTION BUREAU",
       heading: HeadingLevel.TITLE,
       alignment: AlignmentType.CENTER,
     }),
@@ -107,50 +139,51 @@ async function exportDocx(draft: DraftReport, editorHtml: string) {
   );
 
   for (const section of draft.sections) {
-    // Main section heading
     children.push(
       new Paragraph({
-        text: `${section.number}. ${section.heading}`,
+        text: section.heading,
         heading: HeadingLevel.HEADING_1,
       }),
     );
 
     for (const sub of section.subsections) {
-      // Sub-section heading
-      if (sub.heading) {
-        children.push(
-          new Paragraph({
-            text: `${sub.number}  ${sub.heading}`,
-            heading: HeadingLevel.HEADING_2,
-          }),
-        );
+      const raw = sub.content || "";
+      const isTodo = !raw || raw.trim() === "TO DO" || raw.trim() === "[TO BE FILLED]" || raw.trim().startsWith("[NOT IN SOURCE") || raw.trim().startsWith("[TO BE FILLED");
+      if (isTodo) {
+        children.push(new Paragraph({
+          children: [new TextRun({ text: `[TO BE FILLED — ${sub.heading}]`, color: "000000", bold: true, size: 22 })],
+        }));
+      } else {
+        for (const line of raw.split("\n")) {
+          children.push(new Paragraph({
+            children: [new TextRun({ text: line || " ", size: 22 })],
+          }));
+        }
       }
-
-      // Content lines
-      const lines = sub.content.split("\n");
-      for (const line of lines) {
-        const isTodo = line.trim() === "TO DO";
-        children.push(
-          new Paragraph({
-            children: [
-              new TextRun({
-                text: line || " ",
-                color: isTodo ? "EF4444" : "000000",
-                bold: isTodo,
-                size: 22,
-              }),
-            ],
-          }),
-        );
-      }
-      children.push(new Paragraph({ text: "" })); // spacer
+      children.push(new Paragraph({ text: "" }));
     }
   }
 
+  // Footer
+  children.push(new Paragraph({ text: "" }));
+  children.push(new Paragraph({ text: "─".repeat(60) }));
+  children.push(new Paragraph({ children: [new TextRun({ text: "Director General,", size: 22 })] }));
+  children.push(new Paragraph({ children: [new TextRun({ text: "Anti-Corruption Bureau,", size: 22 })] }));
+  children.push(new Paragraph({ children: [new TextRun({ text: "TG, Hyderabad", size: 22 })] }));
+  children.push(new Paragraph({ text: "" }));
+  children.push(new Paragraph({ children: [new TextRun({ text: "To", bold: true, size: 22 })] }));
+  children.push(new Paragraph({ children: [new TextRun({ text: "All the Dy. Superintendents of Police, ACB, Telangana.", size: 22 })] }));
+  children.push(new Paragraph({ children: [new TextRun({ text: "AO (SB), MSB (SB), SB Managers & all the S.B. Assistants.", size: 22 })] }));
+  children.push(new Paragraph({ text: "" }));
+  children.push(new Paragraph({ children: [new TextRun({ text: "Copy to:", bold: true, size: 22 })] }));
+  children.push(new Paragraph({ children: [new TextRun({ text: "The LA and Prl. CLA, ACB, TG, Hyderabad.", size: 22 })] }));
+  children.push(new Paragraph({ children: [new TextRun({ text: "Copy to all the Joint Directors/Deputy Directors, ACB, TG, Hyderabad.", size: 22 })] }));
+  children.push(new Paragraph({ children: [new TextRun({ text: "Copy to the Peshis of the Director General and the Director, ACB, TG, Hyd.", size: 22 })] }));
+
   const doc = new Document({
+    styles: { default: { document: { run: { font: "Trebuchet MS" } } } },
     sections: [{ properties: {}, children }],
   });
-
   const blob = await Packer.toBlob(doc);
   saveAs(blob, `ACB_Draft_Report_${draft.case_id}.docx`);
 }
@@ -177,7 +210,7 @@ function Toolbar({ editor }: { editor: ReturnType<typeof useEditor> }) {
       {btn(false, () => editor.chain().focus().redo().run(), <Redo size={14} />, "Redo")}
       <div className="ml-auto flex items-center gap-1.5 text-xs text-amber-400">
         <AlertTriangle size={12} />
-        <span>Fill all [TO DO] fields before submitting</span>
+        <span>Fill all [TO BE FILLED] fields before submitting</span>
       </div>
     </div>
   );
@@ -192,12 +225,11 @@ export default function DraftReportModal({ draft, onClose }: Props) {
     editorProps: {
       attributes: {
         class: "prose prose-sm max-w-none focus:outline-none p-6 min-h-full",
-        style: "font-family: 'Times New Roman', serif; font-size: 13px; line-height: 1.8; color: #1E293B;",
+        style: "font-family: 'Trebuchet MS', sans-serif; font-size: 16px; line-height: 2; color: #000000;",
       },
     },
   });
 
-  // Close on Escape
   useEffect(() => {
     const handler = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
     window.addEventListener("keydown", handler);
@@ -205,15 +237,14 @@ export default function DraftReportModal({ draft, onClose }: Props) {
   }, [onClose]);
 
   const handleDownload = useCallback(() => {
-    exportDocx(draft, editor?.getHTML() ?? "");
-  }, [draft, editor]);
+    exportDocx(draft);
+  }, [draft]);
 
   return (
     <div
       className="fixed inset-0 z-50 flex flex-col"
       style={{ background: "rgba(0,0,0,0.75)", backdropFilter: "blur(4px)" }}
     >
-      {/* Modal box */}
       <div className="flex flex-col m-4 rounded-2xl overflow-hidden shadow-2xl flex-1"
         style={{ background: "#0F172A", border: "1px solid rgba(6,182,212,0.25)" }}>
 
@@ -226,9 +257,7 @@ export default function DraftReportModal({ draft, onClose }: Props) {
           </div>
           <div className="flex-1 min-w-0">
             <div className="text-white font-bold text-sm">Draft Final Report — Case {draft.case_id}</div>
-            <div className="text-slate-400 text-xs mt-0.5">
-              13 sections · edit [TO DO] fields · download as DOCX
-            </div>
+            <div className="text-slate-400 text-xs mt-0.5">Edit fields · Download as DOCX</div>
           </div>
           <div className="flex items-center gap-2 flex-shrink-0">
             <button
@@ -256,15 +285,16 @@ export default function DraftReportModal({ draft, onClose }: Props) {
           <Toolbar editor={editor} />
         </div>
 
-        {/* Editor area */}
+        {/* Editor */}
         <div className="flex-1 overflow-y-auto" style={{ background: "#FAFAF9" }}>
           <div className="max-w-4xl mx-auto min-h-full shadow-lg" style={{ background: "white" }}>
             <style>{`
-              .ProseMirror h1 { font-size: 1.4rem; font-weight: 700; margin: 1.5rem 0 0.75rem; text-align: center; text-decoration: underline; }
-              .ProseMirror h2 { font-size: 1.1rem; font-weight: 700; margin: 1.25rem 0 0.5rem; }
-              .ProseMirror h3 { font-size: 0.95rem; font-weight: 600; margin: 0.9rem 0 0.3rem; color: #374151; }
-              .ProseMirror p  { margin: 0.2rem 0; }
-              .ProseMirror hr { border-color: #CBD5E1; margin: 1rem 0; }
+              .ProseMirror h1 { font-size: 1.6rem; font-weight: 700; margin: 1.5rem 0 1rem; text-align: center; text-decoration: underline; }
+              .ProseMirror h2 { font-size: 1.3rem; font-weight: 700; margin: 1.5rem 0 0.6rem; }
+              .ProseMirror p  { margin: 0.4rem 0; text-align: justify; font-size: 16px; line-height: 2; }
+              .ProseMirror hr { border-color: #CBD5E1; margin: 1.2rem 0; }
+              .ProseMirror table { width: 100%; margin-bottom: 1.5rem; font-size: 16px; }
+              .ProseMirror td  { vertical-align: top; line-height: 2; }
             `}</style>
             <EditorContent editor={editor} />
           </div>

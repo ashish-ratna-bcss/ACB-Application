@@ -367,6 +367,28 @@ def reindex_case(case_id: str):
         db.close()
 
 
+# ── Draft Progress ────────────────────────────────────────────────────────────
+
+@router.get("/draft-progress/{case_id}", summary="Get draft generation progress")
+def draft_progress(case_id: str):
+    from app.services.ai_draft_generator import get_draft_progress
+    return get_draft_progress(case_id)
+
+
+# ── Saved Draft ───────────────────────────────────────────────────────────────
+
+@router.get("/saved-draft/{case_id}", summary="Get latest saved draft for a case")
+def get_saved_draft(case_id: str):
+    from app.config import PDF_UPLOAD_DIR
+    case_dir = PDF_UPLOAD_DIR / case_id
+    if not case_dir.exists():
+        raise HTTPException(status_code=404, detail="No saved draft found")
+    drafts = sorted(case_dir.glob("draft_*.json"), reverse=True)
+    if not drafts:
+        raise HTTPException(status_code=404, detail="No saved draft found")
+    return json.loads(drafts[0].read_text(encoding="utf-8"))
+
+
 # ── Generate Draft ────────────────────────────────────────────────────────────
 
 @router.get("/generate-draft/{case_id}", summary="Generate draft report from sub-document content")
@@ -424,17 +446,26 @@ def generate_draft(case_id: str):
                 "total_pages": d.total_pages or 0,
             })
 
-        # Try RAG (Qdrant + Ollama) first; fall back to mechanical if unavailable
-        try:
-            from app.services.ai_draft_generator import generate_draft_rag
-            logger.info(f"[draft] Attempting RAG draft for case {case_id}")
-            draft = generate_draft_rag(case_id, db)
-            logger.info(f"[draft] RAG draft complete for case {case_id}")
-        except Exception as rag_exc:
-            logger.warning(f"[draft] RAG failed ({rag_exc}) — using mechanical fallback")
-            draft = build_draft(all_sub_docs, case_id, doc_dicts)
+        from app.services.ai_draft_generator import generate_draft_rag
+        from fastapi.responses import JSONResponse
+        from app.config import PDF_UPLOAD_DIR
+        from datetime import datetime
+        logger.info(f"[draft] Generating RAG draft for case {case_id}")
+        draft = generate_draft_rag(case_id, db)
+        logger.info(f"[draft] RAG draft complete for case {case_id}")
 
-        return draft
+        # Save draft to pdf-files/{case_id}/
+        try:
+            case_dir = PDF_UPLOAD_DIR / case_id
+            case_dir.mkdir(parents=True, exist_ok=True)
+            timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+            draft_path = case_dir / f"draft_{timestamp}.json"
+            draft_path.write_text(json.dumps(draft, ensure_ascii=False, indent=2), encoding="utf-8")
+            logger.info(f"[draft] Saved to {draft_path}")
+        except Exception as exc:
+            logger.warning(f"[draft] Failed to save draft file: {exc}")
+
+        return JSONResponse(content=draft, headers={"Cache-Control": "no-store, no-cache, must-revalidate"})
     finally:
         db.close()
 

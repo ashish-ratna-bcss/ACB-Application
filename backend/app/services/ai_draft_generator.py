@@ -44,6 +44,18 @@ from app.services import report_table_generator
 
 logger = logging.getLogger(__name__)
 
+# ── Draft generation progress (in-memory, keyed by case_id) ──────────────────
+_draft_progress: dict[str, dict] = {}
+
+def get_draft_progress(case_id: str) -> dict:
+    return _draft_progress.get(case_id, {})
+
+def _set_draft_progress(case_id: str, current: int, total: int, sections: list[str]) -> None:
+    _draft_progress[case_id] = {"current": current, "total": total, "sections": sections, "done": False}
+
+def _clear_draft_progress(case_id: str) -> None:
+    _draft_progress.pop(case_id, None)
+
 # ── Template: section groups with semantic queries ────────────────────────────
 # Each group = one Qdrant search + one Ollama call.
 # 'query' is what gets embedded to find relevant sub-docs.
@@ -51,7 +63,7 @@ logger = logging.getLogger(__name__)
 
 SECTION_GROUPS = [
     {
-        "query": "background of the case introduction overview complaint investigation summary",
+        "query": "background of case RC number trap case Anti-Corruption Bureau ACB source of complaint oral written suo motu date demand bribe acceptance accused officer name designation department introduction",
         "sections": {
             "1.1": "Background of the case",
             "1.2": "Source of complaint (Written / Oral / Suo Motu)",
@@ -226,81 +238,13 @@ _SUB_HEADINGS["15.1"] = "Decisions of the Supreme Court"
 
 # ── System prompt ─────────────────────────────────────────────────────────────
 
-_SYSTEM_PROMPT = """You are a Senior Anti-Corruption Bureau Investigation Officer and Legal Drafting Expert writing an official Final Report in a Trap Case for submission to Government authorities for obtaining Prosecution Sanction under the Prevention of Corruption Act, 1988 (as amended in 2018).
+_SYSTEM_PROMPT = """You are an expert legal drafter for the Anti-Corruption Bureau, Telangana. You write official Final Reports in trap cases for submission to Government authorities for obtaining Prosecution Sanction under the Prevention of Corruption Act, 1988.
 
-STRICT RULES — follow without exception:
+You will be given source content extracted from case documents and a set of report sections to fill.
 
-RULE 1: Never create facts. Do not invent names, dates, times, amounts, witnesses, documents, statements, findings, or legal sections. If evidence is unavailable for a section, write exactly: TO DO
+Write the best possible official report using the source content. Use formal government language, third person, past tense. Never fabricate facts — only use what is in the source content. If information for a section is not in the source, write [TO BE FILLED].
 
-RULE 2: Use ONLY facts explicitly stated in SOURCE CONTENT. Never use outside knowledge, never infer, never assume.
-
-RULE 3: Preserve names, designations, dates, amounts, case numbers, FIR numbers, and section numbers EXACTLY as they appear in SOURCE CONTENT. Do not paraphrase or approximate.
-
-RULE 4: Write in formal government report style — third person, past tense, long narrative paragraphs, legal terminology, formal investigation narration, neutral factual tone. Do not use bullet points unless the section explicitly requires it.
-
-RULE 5: Maintain strict chronology: Complaint → Verification → FIR → Pre-Trap → Trap → Post-Trap → Investigation → Findings.
-
-RULE 6: Every conclusion must cite its evidence source. For each finding, mention the specific witness evidence, documentary evidence, digital evidence, or scientific evidence that supports it.
-
-RULE 7: Verbatim transcripts must be reproduced exactly. When SOURCE CONTENT contains recorded conversation transcripts (demand/acceptance exchanges), copy them word-for-word. Do not paraphrase recorded conversations.
-
-RULE 8: When discussing witnesses, always state name, designation, and connection to the case.
-
-RULE 9: Amounts, denominations, and serial numbers of currency notes must match SOURCE CONTENT exactly.
-
-RULE 10: Phenolphthalein / sodium carbonate test results must use the exact scientific terminology from SOURCE CONTENT.
-
-RULE 11: Official record references (file numbers, application numbers, register numbers) must be reproduced exactly from SOURCE CONTENT.
-
-RULE 12: Tabular data (CDR records, currency serial number tables, video/audio hash value tables) must be reproduced exactly. Do not summarize tables.
-
-RULE 13: Telugu or other regional language text in SOURCE CONTENT must be copied verbatim. Do not translate, transliterate, or paraphrase regional language content.
-
-RULE 14: Return valid JSON only. Keys must exactly match the section numbers given. No markdown. No preamble. No explanation outside the JSON.
-
-RULE 15: CONTENT FILTERING — Extract only information relevant to each section. Ignore unrelated content from source documents. Do NOT include facts that belong in other sections. Focus on main narrative content; skip metadata, summaries, and document headers unless directly relevant to the section heading.
-
-FORMATTING RULES — apply to all sections:
-
-FORMAT 1: Section headers follow pattern "X.Y. Section Title:" (numbered with period, space, title, colon)
-
-FORMAT 2: Evidence lists use ➢ bullets: "Evidence for Demand is proved by the following..." followed by ➢-bulleted evidence types (one bullet per evidence category)
-
-FORMAT 3: Bold formatting: **names** of persons, **Section 7(a)**, **case citations**, **key document types**
-
-FORMAT 4: Narrative style: formal prose (third-person, past tense), NO bullet points in narrative paragraphs. Bullets only in evidence lists under "Evidence for X is proved by..."
-
-FORMAT 5: Amounts: exact format Rs.X,XXX/- (Rs. prefix, number with comma, hyphen, no decimal unless in source)
-
-FORMAT 6: Dates: DD.MM.YYYY format (match source exactly)
-
-FORMAT 7: Table references: mention tables inline as "[Table 6.1: Currency Notes with serial numbers and denominations]" then follow with table data
-
-FORMAT 8: Transcripts: preserve verbatim including Telugu/regional text, add timestamps in format [MM:SS] before speaker, format as: "[MM:SS] Speaker | Exact conversation text"
-
-FORMAT 9: Verbatim preservation: Serial numbers, case numbers, application numbers, FIR numbers, phone numbers, IMEI, CDR data, chemical test terminology, regional language — all EXACTLY as in source
-
-FORMAT 10: Case citations: (Year) Reporter SCC Page-AIR Year SC Page (e.g., (1995) 6 SCC 225-AIR 1996 SC 186)
-
-FORMAT 11: Call Data Records: table with columns [Sl.No | Date-Time | AO's mobile | Complaint's mobile | Duration | Cell ID | Tower Location] — preserve exact timestamps HH:MM:SS and full tower addresses
-
-FORMAT 12: Evidence categorization: when listing evidence types, group by category (Oral Evidence, Documentary Evidence, Digital Evidence, Material Evidence) with ➢ bullets under each
-
-FORMAT 13: Currency tables: For section 6.3, extract and format as: "The total amount was Rs.X,XXX/- consisting of Y notes" followed by structured table with Sl.No | Serial Number | Denomination columns
-
-FORMAT 14: CDR tables: For section 14.1, extract exact timestamp HH:MM:SS format, preserve full tower location names, list all communication events in chronological order with complete metadata
-
-FORMAT 15: Witness lists: Always include full name (bold), designation, address, and role/connection to case in single formatted line
-
-FORMAT 16: Section numbering: Maintain X.Y format for all sub-sections, do not use decimals beyond one level
-
-FORMAT 17: Evidence introductions: Every evidence type section should start with "Evidence for [topic] is proved by the following:" followed by ➢ bullets
-
-FORMAT 18: Narrative flow: Connect evidence chronologically, maintain formal tone throughout, use transitional phrases like "Thereupon", "Subsequently", "As a result", "In view of above"
-
-FORMAT 19: Key findings emphasis: Important conclusions should be stated clearly in formal language, followed by specific evidence citation
-
-FORMAT 20: Preserve exact terminology: Use exact terminology from SOURCE for technical terms (phenolphthalein, chemical test, IMEI, CDR), official titles, and designations"""
+Return valid JSON only. Keys must exactly match the section numbers given. No markdown, no preamble, no explanation outside the JSON."""
 
 
 # ── Content retrieval helpers ─────────────────────────────────────────────────
@@ -375,16 +319,112 @@ def _fetch_content_from_db(db, document_id: int, start_page: int, sub_document_i
     return "\n".join(parts)
 
 
+def _load_extracted_evidence(db, document_id: int) -> list[tuple[str, dict]]:
+    """Load all extracted evidence objects for a document.
+
+    Returns: list of (subdoc_title, evidence_dict) tuples
+    """
+    from app.models import SubDocument, SubDocumentContent
+    from app.services.evidence_extractor import deserialize_evidence
+
+    subdocs = db.query(SubDocument).filter(SubDocument.document_id == document_id).all()
+    results = []
+
+    for sd in subdocs:
+        content = db.query(SubDocumentContent).filter(
+            SubDocumentContent.sub_document_id == sd.id
+        ).first()
+
+        if content and content.evidence_objects:
+            evidence = deserialize_evidence(content.evidence_objects)
+            results.append((sd.title or "Unknown", evidence))
+
+    return results
+
+
+def _populate_table_sections(db, document_id: int, filled: dict[str, str]) -> None:
+    """Populate table sections (6.3, 8.1, 9.8, 12.1, 14.1) using extracted evidence.
+
+    Directly populates `filled` dict with table HTML instead of AI-generated text.
+    """
+    evidence_list = _load_extracted_evidence(db, document_id)
+
+    # Aggregate evidence from all subdocs
+    all_witnesses = []
+    all_currency = []
+    all_cdr = []
+    all_findings = []
+
+    for title, evidence in evidence_list:
+        all_witnesses.extend(evidence.get("witnesses", []))
+        all_currency.extend(evidence.get("currency_notes", []))
+        all_cdr.extend(evidence.get("cdr_records", []))
+        all_findings.extend(evidence.get("findings", []))
+
+    # Deduplicate by key fields
+    seen_witness_names = set()
+    dedup_witnesses = []
+    for w in all_witnesses:
+        name = w.get("name", "").lower()
+        if name and name not in seen_witness_names:
+            dedup_witnesses.append(w)
+            seen_witness_names.add(name)
+
+    seen_currency = set()
+    dedup_currency = []
+    for c in all_currency:
+        key = (c.get("serial_number"), c.get("denomination"))
+        if key not in seen_currency:
+            dedup_currency.append(c)
+            seen_currency.add(key)
+
+    seen_cdr = set()
+    dedup_cdr = []
+    for r in all_cdr:
+        key = (r.get("date_time"), r.get("ao_phone"), r.get("complaint_phone"))
+        if key not in seen_cdr:
+            dedup_cdr.append(r)
+            seen_cdr.add(key)
+
+    # Findings are usually unique, keep as-is
+
+    # Generate and populate tables
+    if dedup_currency:
+        filled["6.3"] = report_table_generator.generate_currency_table(dedup_currency)
+
+    if dedup_witnesses:
+        filled["8.1"] = report_table_generator.generate_witness_list(dedup_witnesses)
+
+    if dedup_cdr:
+        filled["14.1"] = report_table_generator.generate_cdr_table(dedup_cdr)
+
+    if all_findings:
+        filled["12.1"] = report_table_generator.generate_abstract_table(all_findings)
+
+
 # ── Main entry point ──────────────────────────────────────────────────────────
 
-def generate_draft_rag(case_id: str, db) -> dict:
+def generate_draft_rag(case_id: str, db, document_id: int | None = None) -> dict:
     """
-    Generate draft using RAG (Qdrant + Ollama).
+    Generate draft using RAG (Qdrant + Ollama) with evidence-first table population.
+
+    Args:
+        case_id: Case identifier
+        db: Database session
+        document_id: Optional document ID. If not provided, uses most recent document for case.
+
     Raises on failure so caller can fall back to mechanical generator.
     """
     import ollama
     from qdrant_client import QdrantClient
     from qdrant_client.models import FieldCondition, Filter, MatchValue
+    from app.models import Document
+
+    # Find document_id if not provided
+    if document_id is None:
+        doc = db.query(Document).filter(Document.case_id == case_id).order_by(Document.created_at.desc()).first()
+        if doc:
+            document_id = doc.id
 
     ollama_url  = os.getenv("OLLAMA_URL",           OLLAMA_URL)
     embed_model = os.getenv("OLLAMA_EMBED_MODEL",  OLLAMA_EMBED_MODEL)
@@ -401,13 +441,18 @@ def generate_draft_rag(case_id: str, db) -> dict:
     )
 
     filled: dict[str, str] = {}
+    active_groups = SECTION_GROUPS
+    total_groups = len(active_groups)
+    _set_draft_progress(case_id, 0, total_groups, [])
 
-    for i, group in enumerate(SECTION_GROUPS, 1):
+    for i, group in enumerate(active_groups, 1):
         section_keys = list(group["sections"].keys())
-        logger.info(f"[draft] Group {i}/{len(SECTION_GROUPS)}: {section_keys}")
+        _set_draft_progress(case_id, i, total_groups, section_keys)
+        logger.info(f"[draft] Group {i}/{total_groups}: {section_keys}")
 
-        # 1. Embed the semantic query
-        embed_resp  = ollama_client.embeddings(model=embed_model, prompt=group["query"])
+        # 1. Embed the semantic query — combine query + section headings for richer retrieval
+        combined_query = group["query"] + " " + " ".join(group["sections"].values())
+        embed_resp  = ollama_client.embeddings(model=embed_model, prompt=combined_query)
         query_vec   = embed_resp.embedding
 
         # 2. Qdrant search — fetch more hits to get 3 unique sub-docs after dedup
@@ -462,15 +507,14 @@ def generate_draft_rag(case_id: str, db) -> dict:
             indent=2, ensure_ascii=False,
         )
         user_msg = (
-            f"SOURCE CONTENT (retrieved from uploaded case documents):\n{retrieved}\n\n"
-            f"EXTRACT AND FILL THESE TEMPLATE SECTIONS:\n"
-            f"{template_skeleton}\n\n"
-            f"EXTRACTION INSTRUCTIONS:\n"
-            f"1. For each section, extract ONLY the information directly relevant to that section heading\n"
-            f"2. Ignore unrelated content from the source documents\n"
-            f"3. Do NOT include information that belongs in other sections\n"
-            f"4. Focus on main content; skip metadata and summaries\n"
-            f"5. Use \"TO DO\" for any section where specific information is not found in SOURCE CONTENT\n"
+            f"SOURCE CONTENT (retrieved from case documents):\n{retrieved}\n\n"
+            f"SECTIONS TO FILL:\n{template_skeleton}\n\n"
+            f"INSTRUCTIONS:\n"
+            f"1. For each section, read the section heading carefully\n"
+            f"2. From SOURCE CONTENT, identify the document title and the relevant content that matches the section heading\n"
+            f"3. Extract and write the content in formal government report language (third person, past tense)\n"
+            f"4. Use [NOT IN SOURCE] if the document type would not contain this information\n"
+            f"5. Use [TO BE FILLED] if the information exists elsewhere but is missing from this source\n"
             f"6. Return valid JSON with identical keys. No markdown, no preamble."
         )
 
@@ -492,7 +536,17 @@ def generate_draft_rag(case_id: str, db) -> dict:
             result = {}
 
         for k in section_keys:
-            filled[k] = str(result.get(k) or TODO).strip() or TODO
+            val = result.get(k)
+            val = str(val).strip() if val is not None else ""
+            filled[k] = val if len(val) > 10 else TODO
+
+    # Populate table sections from extracted evidence (overrides AI-generated content if available)
+    if document_id:
+        try:
+            _populate_table_sections(db, document_id, filled)
+            logger.info(f"[draft] Populated table sections from extracted evidence (doc_id={document_id})")
+        except Exception as exc:
+            logger.warning(f"[draft] Table population failed: {exc} — using AI-generated tables")
 
     # Inject hardcoded legal texts — never touched by AI
     filled["10.6"] = SECTION_20_PC_ACT_TEXT
@@ -504,6 +558,7 @@ def generate_draft_rag(case_id: str, db) -> dict:
     filled["13.0"] = PROSECUTION_SANCTION_TEXT
     filled["13.4"] = SECTION_19_PC_ACT_TEXT
 
+    _clear_draft_progress(case_id)
     return _assemble_output(filled, case_id)
 
 
@@ -525,9 +580,16 @@ def _assemble_output(filled: dict[str, str], case_id: str) -> dict:
             "subsections": subsections,
         })
 
+    from datetime import date
+    today = date.today().strftime("%d.%m.%Y")
+
     return {
         "case_id":      case_id,
-        "title":        "FORMAT FOR FINAL REPORT IN TRAP CASES",
+        "office":       "Office of the Director General,\nAnti-Corruption Bureau,\nTG, Hyderabad.",
+        "case_name":    case_id,
+        "date":         today,
+        "doc_title":    "CIRCULAR MEMORANDUM",
+        "sub":          "Sub:-\tFinal Reports – Drafting of Final Reports in D.Es., R.Es. and R.Cs. – Instructions – Issued.",
         "case_number":  case_id,
         "sections":     sections,
         "generated_by": "rag",

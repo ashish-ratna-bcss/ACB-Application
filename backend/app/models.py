@@ -74,6 +74,7 @@ class SubDocumentContent(Base):
     key_findings = Column(Text)   # JSON array
     key_actions = Column(Text)    # JSON array
     organizations = Column(Text)  # JSON array
+    evidence_objects = Column(Text, nullable=True)  # JSON: {witnesses, currency_notes, cdr_records, findings, evidence_type}
     created_at = Column(DateTime, default=datetime.utcnow)
 
 

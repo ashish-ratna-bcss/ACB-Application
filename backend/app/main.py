@@ -80,3 +80,14 @@ async def root():
 @app.get("/health", tags=["Health"])
 async def health():
     return {"status": "healthy"}
+
+
+@app.get("/pdf/draft-progress/{case_id}", tags=["Draft"])
+async def draft_progress_direct(case_id: str):
+    from app.services.ai_draft_generator import get_draft_progress
+    return get_draft_progress(case_id)
+
+
+@app.get("/test-ping/{val}", tags=["Debug"])
+async def test_ping(val: str):
+    return {"pong": val}

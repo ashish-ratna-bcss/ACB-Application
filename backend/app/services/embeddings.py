@@ -94,7 +94,8 @@ def store_subdoc_embeddings(
             logger.info(f"Stored {len(points)} chunk-point(s) for {total} sub-doc(s) in Qdrant")
 
     except Exception as exc:
-        logger.warning(f"Embedding step skipped — {exc}")
+        logger.error(f"Embedding step failed — {exc}")
+        raise
 
 
 def _ensure_collection(qdrant) -> None:
