@@ -89,8 +89,13 @@ Output format (MUST include reference_number and reference_prefix):
 }"""
 
 
-def detect_subdocuments(page_texts: list[tuple[int, str]]) -> list[dict]:
+def detect_subdocuments(page_texts: list[tuple[int, str]], document_id: int | None = None) -> list[dict]:
+    logger.info(f"[detect_subdocuments] START - doc_id={document_id}, page_texts is None={page_texts is None}")
+    if page_texts is None:
+        logger.warning(f"[detect_subdocuments] page_texts is None - returning fallback single doc")
+        return [{"title": "Unknown", "document_type": "Unknown", "start_page": 1, "end_page": 1, "confidence": 0.5}]
     if not page_texts:
+        logger.info(f"[detect_subdocuments] No pages, returning empty")
         return []
 
     # Build page map for reference-based splitting
@@ -104,6 +109,11 @@ def detect_subdocuments(page_texts: list[tuple[int, str]]) -> list[dict]:
     for i, batch in enumerate(batches, 1):
         batch_pages = f"{batch[0][0]}–{batch[-1][0]}"
         logger.info(f"  Batch {i}/{len(batches)}: pages {batch_pages} ({len(batch)} pages)")
+
+        # Track batch progress in UI
+        if document_id:
+            from app.services.progress_store import set_stage_progress
+            set_stage_progress(document_id, "detecting_subdocuments", i, len(batches), "batches")
         try:
             result = _detect_batch(batch)
             if result:
@@ -117,12 +127,29 @@ def detect_subdocuments(page_texts: list[tuple[int, str]]) -> list[dict]:
     if not all_subdocs:
         return _fallback_single(page_texts)
 
-    # Cap end_pages to document max (fix hallucinations)
+    # Sanitize all docs: ensure start_page and end_page are valid integers
+    sanitized = []
     for doc in all_subdocs:
+        start = doc.get("start_page")
+        end = doc.get("end_page")
+        # Skip docs with None or non-integer page numbers
+        if start is None or end is None or not isinstance(start, int) or not isinstance(end, int):
+            logger.warning(f"Skipping doc with invalid pages: start={start}, end={end}")
+            continue
+        if start < 1 or end < start:
+            logger.warning(f"Skipping doc with invalid range: {start}-{end}")
+            continue
+        sanitized.append(doc)
+
+    if not sanitized:
+        return _fallback_single(page_texts)
+
+    # Cap end_pages to document max (fix hallucinations)
+    for doc in sanitized:
         if doc.get("end_page", 0) > max_page:
             doc["end_page"] = max_page
 
-    resolved = _resolve_overlaps(all_subdocs)
+    resolved = _resolve_overlaps(sanitized)
     merged = _merge_across_boundaries(resolved)
     split = _split_by_reference_changes(merged, page_map)
     logger.info(f"Sub-doc detection complete: {len(split)} sub-doc(s) after all processing")
@@ -178,7 +205,18 @@ def _detect_batch(batch: list[tuple[int, str]]) -> list[dict]:
 
     raw = response.message.content or "{}"
     data = json.loads(raw)
-    return data.get("documents", [])
+
+    # Validate documents: filter out any with null/missing start_page or end_page
+    docs = data.get("documents", [])
+    valid_docs = []
+    for doc in docs:
+        start = doc.get("start_page")
+        end = doc.get("end_page")
+        if start is not None and end is not None and isinstance(start, int) and isinstance(end, int):
+            if start > 0 and end >= start:
+                valid_docs.append(doc)
+
+    return valid_docs
 
 
 def _extract_reference_markers(text: str) -> list[str]:

@@ -164,6 +164,14 @@ def run_pipeline(document_id: int, case_id: str, file_name: str, start_stage: st
                 set_stage_progress(document_id, STAGE_RECONSTRUCT, idx, total_pages, "pages")
             db.commit()
             _mark_stage_completed(db, document_id, STAGE_RECONSTRUCT)
+        else:
+            # Load reconstructed data from database if not re-running this stage
+            if start_idx > STAGES_LIST.index(STAGE_RECONSTRUCT):
+                page_contents = db.query(PageContent).filter(
+                    PageContent.document_id == document_id
+                ).order_by(PageContent.page_number).all()
+                if page_contents:
+                    reconstructed = [(pc.page_number, pc.page_text) for pc in page_contents]
 
         # ── Step 4: AI Sub-document Detection ────────────────────────────────
         subdocs = None
@@ -172,7 +180,7 @@ def run_pipeline(document_id: int, case_id: str, file_name: str, start_stage: st
             set_stage_progress(document_id, STAGE_DETECT, 0, 0, "pages")
             logger.info(f"[doc={document_id}] Detecting sub-documents across {total_pages} pages")
 
-            subdocs = detect_subdocuments(reconstructed)
+            subdocs = detect_subdocuments(reconstructed, document_id=document_id)
             set_stage_progress(document_id, STAGE_DETECT, total_pages, total_pages, "pages")
             logger.info(f"[doc={document_id}] Found {len(subdocs)} sub-document(s)")
 

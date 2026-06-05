@@ -537,7 +537,18 @@ export default function GenerateReportPage() {
                       <label className="form-label">Select Case</label>
                       <select
                         value={selectedExistingCase}
-                        onChange={e => setSelectedExistingCase(e.target.value)}
+                        onChange={e => {
+                          setSelectedExistingCase(e.target.value);
+                          if (e.target.value) {
+                            fetch("http://localhost:8000/pdf/list")
+                              .then(r => r.json())
+                              .then(data => {
+                                const doc = data.documents?.find(d => d.case_id === e.target.value);
+                                if (doc) setDocumentId(doc.document_id);
+                              })
+                              .catch(err => console.error("Failed to fetch document_id:", err));
+                          }
+                        }}
                         className="form-input"
                         disabled={isBusy}
                       >

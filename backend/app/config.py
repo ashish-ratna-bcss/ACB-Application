@@ -18,8 +18,8 @@ if POPPLER_PATH and POPPLER_PATH not in os.environ.get("PATH", ""):
     os.environ["PATH"] = POPPLER_PATH + os.pathsep + os.environ.get("PATH", "")
 
 # Batch limits for AI section detection
-AI_BATCH_MAX_PAGES = 5
-AI_BATCH_MAX_WORDS = 6000
+AI_BATCH_MAX_PAGES = 3
+AI_BATCH_MAX_WORDS = 3000
 
 # Ollama
 OLLAMA_URL = "http://localhost:11434"
