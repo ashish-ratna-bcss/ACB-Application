@@ -272,7 +272,7 @@ export default function GenerateReportPage() {
   useEffect(() => {
     (async () => {
       try {
-        const res = await fetch("http://localhost:8000/pdf/cases");
+        const res = await fetch(`${BACKEND_URL}/pdf/cases`);
         const data = await res.json();
         setCases(data.cases || []);
       } catch { }
@@ -319,7 +319,7 @@ export default function GenerateReportPage() {
       };
       xhr.onerror = () => reject(new Error("Network error during upload"));
       xhr.onabort = () => reject(new Error("Upload cancelled"));
-      xhr.open("POST", "http://localhost:8000/pdf/upload");
+      xhr.open("POST", `${BACKEND_URL}/pdf/upload`);
       xhr.send(formData);
     });
   }
@@ -328,8 +328,8 @@ export default function GenerateReportPage() {
     pollRef.current = setInterval(async () => {
       try {
         const [statusRes, logsRes] = await Promise.all([
-          fetch(`http://localhost:8000/pdf/status/${docId}`),
-          fetch(`http://localhost:8000/pdf/logs/${docId}`),
+          fetch(`${BACKEND_URL}/pdf/status/${docId}`),
+          fetch(`${BACKEND_URL}/pdf/logs/${docId}`),
         ]);
         const data    = await statusRes.json();
         const logData = await logsRes.json();
@@ -341,7 +341,7 @@ export default function GenerateReportPage() {
 
         if (data.status === "completed") {
           stopPolling();
-          const sdRes  = await fetch(`http://localhost:8000/pdf/subdocuments/${docId}`);
+          const sdRes  = await fetch(`${BACKEND_URL}/pdf/subdocuments/${docId}`);
           const sdData = await sdRes.json();
           setSubdocs(sdData.subdocuments ?? []);
           setUiStage("done");
@@ -386,7 +386,7 @@ export default function GenerateReportPage() {
     setUiStage("processing");
 
     try {
-      const res = await fetch(`http://localhost:8000/pdf/rerun/${documentId}?start_stage=${stage}`, {
+      const res = await fetch(`${BACKEND_URL}/pdf/rerun/${documentId}?start_stage=${stage}`, {
         method: "POST",
       });
       if (res.ok) {

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, lazy, Suspense } from "react";
+import { BACKEND_URL } from "@/lib/config";
 import dynamic from "next/dynamic";
 import TopNav from "@/components/layout/TopNav";
 import {
@@ -300,7 +301,7 @@ export default function ViewReportsPage() {
 
   // Load case list on mount
   useEffect(() => {
-    fetch("http://localhost:8000/pdf/cases")
+    fetch(`${BACKEND_URL}/pdf/cases`)
       .then(r => r.json())
       .then(d => setCases(d.cases || []))
       .catch(() => setError("Failed to load cases"))
@@ -313,7 +314,7 @@ export default function ViewReportsPage() {
     setCaseDetail(null);
     setError("");
     setLoading(true);
-    fetch(`http://localhost:8000/pdf/case/${cid}`)
+    fetch(`${BACKEND_URL}/pdf/case/${cid}`)
       .then(r => r.json())
       .then(d => setCaseDetail(d))
       .catch(() => setError("Failed to load case details"))
@@ -329,7 +330,7 @@ export default function ViewReportsPage() {
     setReindexing(true);
     setReindexMsg("");
     try {
-      const res = await fetch(`http://localhost:8000/pdf/reindex/${selectedCase}`, { method: "POST" });
+      const res = await fetch(`${BACKEND_URL}/pdf/reindex/${selectedCase}`, { method: "POST" });
       const data = await res.json();
       if (!res.ok) throw new Error(data.detail || "Reindex failed");
       setReindexMsg(`✓ ${data.embeddings_stored} embeddings stored`);
@@ -344,7 +345,7 @@ export default function ViewReportsPage() {
     if (!selectedCase || draftLoading) return;
     setDraftLoading(true);
     try {
-      const res = await fetch(`http://localhost:8000/pdf/generate-draft/${selectedCase}`);
+      const res = await fetch(`${BACKEND_URL}/pdf/generate-draft/${selectedCase}`);
       if (!res.ok) throw new Error("Failed to generate draft");
       const data: DraftReport = await res.json();
       setDraft(data);
