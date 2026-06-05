@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useCallback, useEffect } from "react";
+import { BACKEND_URL } from "@/lib/config";
 import TopNav from "@/components/layout/TopNav";
 import {
   FileText, Upload, Sparkles, X, CheckCircle2, AlertCircle,
@@ -540,10 +541,10 @@ export default function GenerateReportPage() {
                         onChange={e => {
                           setSelectedExistingCase(e.target.value);
                           if (e.target.value) {
-                            fetch("http://localhost:8000/pdf/list")
+                            fetch(`${BACKEND_URL}/pdf/list`)
                               .then(r => r.json())
                               .then(data => {
-                                const doc = data.documents?.find(d => d.case_id === e.target.value);
+                                const doc = data.documents?.find((d: any) => d.case_id === e.target.value);
                                 if (doc) setDocumentId(doc.document_id);
                               })
                               .catch(err => console.error("Failed to fetch document_id:", err));
