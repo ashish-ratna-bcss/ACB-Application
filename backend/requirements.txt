@@ -1,0 +1,21 @@
+fastapi==0.115.5
+uvicorn[standard]==0.32.1
+python-multipart==0.0.17
+aiofiles==24.1.0
+
+# Database
+sqlalchemy==2.0.36
+
+# PDF processing
+pdf2image==1.17.0
+Pillow==11.0.0
+
+# OCR
+paddlepaddle==2.6.2
+paddleocr==2.8.1
+
+# AI section detection + embeddings (Ollama)
+ollama==0.4.4
+
+# Vector store
+qdrant-client==1.12.1

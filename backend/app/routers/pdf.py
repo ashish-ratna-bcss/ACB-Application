@@ -1,0 +1,560 @@
+import json
+import logging
+import re
+import uuid
+from datetime import datetime
+from pathlib import Path
+
+logger = logging.getLogger(__name__)
+
+import aiofiles
+from fastapi import APIRouter, BackgroundTasks, File, Form, HTTPException, Query, UploadFile
+from fastapi.responses import JSONResponse
+from sqlalchemy.orm import Session
+
+from app.config import ALLOWED_CONTENT_TYPE, MAX_FILE_SIZE_MB, PDF_UPLOAD_DIR
+from app.database import SessionLocal
+from app.models import Document, SubDocument, SubDocumentContent
+from app.services.pipeline import (
+    STAGES_LIST, run_pipeline, _clear_downstream_data, _mark_stage_completed
+)
+
+router = APIRouter(prefix="/pdf", tags=["PDF"])
+
+_CASE_ID_RE = re.compile(r"^[A-Za-z0-9_-]+$")
+
+
+# ── Upload ───────────────────────────────────────────────────────────────────
+
+@router.post("/upload", summary="Upload a PDF and start processing pipeline")
+async def upload_pdf(
+    background_tasks: BackgroundTasks,
+    case_id: str = Form(..., alias="caseId"),
+    file: UploadFile = File(...),
+):
+    case_id = case_id.strip()
+    if not case_id or not _CASE_ID_RE.match(case_id):
+        raise HTTPException(status_code=400, detail="Invalid caseId. Only alphanumeric, hyphens, underscores allowed.")
+
+    if file.content_type != ALLOWED_CONTENT_TYPE:
+        raise HTTPException(status_code=400, detail=f"Invalid file type. Only PDF accepted.")
+
+    contents = await file.read()
+    size_mb = len(contents) / (1024 * 1024)
+    if size_mb > MAX_FILE_SIZE_MB:
+        raise HTTPException(status_code=413, detail=f"File too large ({size_mb:.1f} MB). Max {MAX_FILE_SIZE_MB} MB.")
+
+    if not contents.startswith(b"%PDF-"):
+        raise HTTPException(status_code=400, detail="File does not appear to be a valid PDF.")
+
+    case_dir = PDF_UPLOAD_DIR / case_id
+    case_dir.mkdir(parents=True, exist_ok=True)
+
+    original_stem = Path(file.filename or "document").stem
+    timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+    unique_id = uuid.uuid4().hex[:8]
+    safe_name = f"{original_stem}_{timestamp}_{unique_id}.pdf"
+    dest_path = case_dir / safe_name
+
+    async with aiofiles.open(dest_path, "wb") as out:
+        await out.write(contents)
+
+    db: Session = SessionLocal()
+    try:
+        doc = Document(
+            case_id=case_id,
+            file_name=safe_name,
+            original_name=file.filename,
+            file_path=str(dest_path),
+            status="uploaded",
+        )
+        db.add(doc)
+        db.commit()
+        db.refresh(doc)
+        document_id = doc.id
+    finally:
+        db.close()
+
+    background_tasks.add_task(run_pipeline, document_id, case_id, safe_name)
+
+    return JSONResponse(
+        status_code=201,
+        content={
+            "message": "PDF uploaded. Processing pipeline started.",
+            "document_id": document_id,
+            "case_id": case_id,
+            "file_name": safe_name,
+            "original_name": file.filename,
+            "size_bytes": len(contents),
+            "size_mb": round(size_mb, 3),
+            "status": "uploaded",
+        },
+    )
+
+
+# ── Rerun stage ──────────────────────────────────────────────────────────────
+
+@router.post("/rerun/{document_id}", summary="Rerun pipeline from a specific stage")
+def rerun_stage(
+    document_id: int,
+    background_tasks: BackgroundTasks,
+    start_stage: str = Query(..., description="Stage to start from (e.g., detecting_subdocuments)"),
+):
+    if start_stage not in STAGES_LIST:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid start_stage. Must be one of: {', '.join(STAGES_LIST)}"
+        )
+
+    db: Session = SessionLocal()
+    try:
+        doc = db.query(Document).filter(Document.id == document_id).first()
+        if not doc:
+            raise HTTPException(status_code=404, detail="Document not found")
+
+        case_id = doc.case_id
+        file_name = doc.file_name
+
+        # Clear downstream data (stage start_stage+1 onwards)
+        _clear_downstream_data(db, document_id, start_stage)
+
+        # Reset document status
+        doc.status = "processing"
+        doc.current_stage = start_stage
+        doc.error_message = None
+        db.commit()
+
+        # Queue pipeline rerun
+        background_tasks.add_task(run_pipeline, document_id, case_id, file_name, start_stage)
+
+        return JSONResponse(
+            status_code=202,
+            content={
+                "message": f"Pipeline rerun queued from stage '{start_stage}'",
+                "document_id": document_id,
+                "case_id": case_id,
+                "start_stage": start_stage,
+                "status": "queued",
+            },
+        )
+    finally:
+        db.close()
+
+
+# ── Status ───────────────────────────────────────────────────────────────────
+
+@router.get("/status/{document_id}", summary="Get document processing status")
+def get_status(document_id: int):
+    from app.services.progress_store import get_all_progress
+    db: Session = SessionLocal()
+    try:
+        doc = db.query(Document).filter(Document.id == document_id).first()
+        if not doc:
+            raise HTTPException(status_code=404, detail="Document not found")
+        return {
+            "document_id": doc.id,
+            "case_id": doc.case_id,
+            "file_name": doc.file_name,
+            "status": doc.status,
+            "current_stage": doc.current_stage,
+            "total_pages": doc.total_pages,
+            "error_message": doc.error_message,
+            "created_at": doc.created_at.isoformat() if doc.created_at else None,
+            "stage_progress": get_all_progress(document_id),
+        }
+    finally:
+        db.close()
+
+
+# ── Sub-documents ─────────────────────────────────────────────────────────────
+
+@router.get("/subdocuments/{document_id}", summary="Get sub-documents extracted from a document")
+def get_subdocuments(document_id: int):
+    db: Session = SessionLocal()
+    try:
+        doc = db.query(Document).filter(Document.id == document_id).first()
+        if not doc:
+            raise HTTPException(status_code=404, detail="Document not found")
+
+        subdocs = (
+            db.query(SubDocument)
+            .filter(SubDocument.document_id == document_id)
+            .order_by(SubDocument.start_page)
+            .all()
+        )
+
+        result = []
+        for sd in subdocs:
+            content = (
+                db.query(SubDocumentContent)
+                .filter(SubDocumentContent.sub_document_id == sd.id)
+                .first()
+            )
+            result.append({
+                "id": sd.id,
+                "title": sd.title,
+                "document_type": sd.document_type,
+                "start_page": sd.start_page,
+                "end_page": sd.end_page,
+                "confidence_score": sd.confidence_score,
+                "content": {
+                    "subject": content.subject if content else None,
+                    "purpose": content.purpose if content else None,
+                    "summary": content.summary if content else None,
+                    "main_content": (content.main_content or "")[:500] if content else None,
+                    "key_persons": json.loads(content.key_persons or "[]") if content else [],
+                    "key_dates": json.loads(content.key_dates or "[]") if content else [],
+                    "key_findings": json.loads(content.key_findings or "[]") if content else [],
+                    "key_actions": json.loads(content.key_actions or "[]") if content else [],
+                    "organizations": json.loads(content.organizations or "[]") if content else [],
+                } if content else None,
+            })
+
+        return {
+            "document_id": document_id,
+            "case_id": doc.case_id,
+            "status": doc.status,
+            "total_pages": doc.total_pages,
+            "subdocument_count": len(result),
+            "subdocuments": result,
+        }
+    finally:
+        db.close()
+
+
+# ── Logs ──────────────────────────────────────────────────────────────────────
+
+@router.get("/logs/{document_id}", summary="Get processing logs for a document")
+def get_document_logs(document_id: int):
+    from app.services.log_store import get_logs
+    return {"document_id": document_id, "logs": get_logs(document_id)}
+
+
+# ── List ─────────────────────────────────────────────────────────────────────
+
+@router.get("/list", summary="List all uploaded documents")
+def list_pdfs():
+    db: Session = SessionLocal()
+    try:
+        docs = db.query(Document).order_by(Document.created_at.desc()).all()
+        return {
+            "count": len(docs),
+            "documents": [
+                {
+                    "document_id": d.id,
+                    "case_id": d.case_id,
+                    "file_name": d.file_name,
+                    "original_name": d.original_name,
+                    "status": d.status,
+                    "total_pages": d.total_pages,
+                    "created_at": d.created_at.isoformat() if d.created_at else None,
+                }
+                for d in docs
+            ],
+        }
+    finally:
+        db.close()
+
+
+# ── Reindex embeddings ────────────────────────────────────────────────────────
+
+@router.post("/reindex/{case_id}", summary="Re-generate Qdrant embeddings from existing DB content")
+def reindex_case(case_id: str):
+    import os
+    import uuid as _uuid
+    try:
+        import ollama
+        from qdrant_client import QdrantClient
+        from qdrant_client.models import Distance, PointStruct, VectorParams
+    except ImportError as e:
+        raise HTTPException(status_code=500, detail=f"Missing dependency: {e}")
+
+    from app.config import EMBEDDING_DIM, OLLAMA_EMBED_MODEL, OLLAMA_URL, QDRANT_COLLECTION, QDRANT_URL
+
+    db: Session = SessionLocal()
+    try:
+        docs = db.query(Document).filter(Document.case_id == case_id).all()
+        if not docs:
+            raise HTTPException(status_code=404, detail="Case not found")
+
+        ollama_url  = os.getenv("OLLAMA_URL",         OLLAMA_URL)
+        embed_model = os.getenv("OLLAMA_EMBED_MODEL", OLLAMA_EMBED_MODEL)
+        qdrant_url  = os.getenv("QDRANT_URL",         QDRANT_URL)
+
+        ollama_client = ollama.Client(host=ollama_url)
+        qdrant        = QdrantClient(url=qdrant_url, timeout=10)
+
+        # Ensure collection exists
+        try:
+            qdrant.get_collection(QDRANT_COLLECTION)
+        except Exception:
+            qdrant.create_collection(
+                collection_name=QDRANT_COLLECTION,
+                vectors_config=VectorParams(size=EMBEDDING_DIM, distance=Distance.COSINE),
+            )
+
+        points: list[PointStruct] = []
+        skipped = 0
+
+        for doc in docs:
+            if doc.status != "completed":
+                skipped += 1
+                continue
+
+            subdocs = (
+                db.query(SubDocument)
+                .filter(SubDocument.document_id == doc.id)
+                .all()
+            )
+
+            for sd in subdocs:
+                content = (
+                    db.query(SubDocumentContent)
+                    .filter(SubDocumentContent.sub_document_id == sd.id)
+                    .first()
+                )
+                if not content:
+                    continue
+
+                from app.services.embeddings import _chunks
+
+                header = "\n".join(filter(None, [
+                    content.title,
+                    content.subject,
+                    content.summary,
+                    " ".join(json.loads(content.key_findings or "[]")),
+                    " ".join(json.loads(content.key_actions  or "[]")),
+                ]))
+
+                text_chunks = _chunks(content.main_content or "")
+                for chunk_idx, chunk_text in enumerate(text_chunks):
+                    embed_text = f"{header}\n{chunk_text}".strip()[:8000]
+                    if not embed_text:
+                        continue
+
+                    resp   = ollama_client.embeddings(model=embed_model, prompt=embed_text)
+                    vector = resp.embedding
+
+                    points.append(PointStruct(
+                        id=str(_uuid.uuid4()),
+                        vector=vector,
+                        payload={
+                            "case_id":         case_id,
+                            "document_id":     doc.id,
+                            "sub_document_id": sd.id,
+                            "title":           sd.title,
+                            "document_type":   sd.document_type,
+                            "start_page":      sd.start_page,
+                            "end_page":        sd.end_page,
+                            "chunk_index":     chunk_idx,
+                            "chunk_total":     len(text_chunks),
+                        },
+                    ))
+
+                logger.info(f"[reindex] Embedded sub-doc {sd.id} '{sd.title}' — {len(text_chunks)} chunk(s)")
+
+        if points:
+            qdrant.upsert(collection_name=QDRANT_COLLECTION, points=points)
+
+        return {
+            "case_id":         case_id,
+            "embeddings_stored": len(points),
+            "documents_skipped": skipped,
+            "status":          "ok",
+        }
+
+    finally:
+        db.close()
+
+
+# ── Generate Draft ────────────────────────────────────────────────────────────
+
+@router.get("/generate-draft/{case_id}", summary="Generate draft report from sub-document content")
+def generate_draft(case_id: str):
+    from app.services.draft_generator import build_draft
+    db: Session = SessionLocal()
+    try:
+        docs = (
+            db.query(Document)
+            .filter(Document.case_id == case_id)
+            .order_by(Document.created_at.desc())
+            .all()
+        )
+        if not docs:
+            raise HTTPException(status_code=404, detail="Case not found")
+
+        all_sub_docs = []
+        doc_dicts = []
+        for d in docs:
+            subdocs = (
+                db.query(SubDocument)
+                .filter(SubDocument.document_id == d.id)
+                .order_by(SubDocument.start_page)
+                .all()
+            )
+            for sd in subdocs:
+                content = (
+                    db.query(SubDocumentContent)
+                    .filter(SubDocumentContent.sub_document_id == sd.id)
+                    .first()
+                )
+                all_sub_docs.append({
+                    "id": sd.id,
+                    "title": sd.title,
+                    "document_type": sd.document_type,
+                    "start_page": sd.start_page,
+                    "end_page": sd.end_page,
+                    "confidence_score": sd.confidence_score,
+                    "content": {
+                        "subject": content.subject if content else None,
+                        "purpose": content.purpose if content else None,
+                        "summary": content.summary if content else None,
+                        "main_content": content.main_content if content else None,
+                        "key_persons": json.loads(content.key_persons or "[]") if content else [],
+                        "key_dates": json.loads(content.key_dates or "[]") if content else [],
+                        "key_findings": json.loads(content.key_findings or "[]") if content else [],
+                        "key_actions": json.loads(content.key_actions or "[]") if content else [],
+                        "organizations": json.loads(content.organizations or "[]") if content else [],
+                    } if content else None,
+                })
+            doc_dicts.append({
+                "file_name": d.file_name,
+                "original_name": d.original_name,
+                "status": d.status,
+                "total_pages": d.total_pages or 0,
+            })
+
+        # Try RAG (Qdrant + Ollama) first; fall back to mechanical if unavailable
+        try:
+            from app.services.ai_draft_generator import generate_draft_rag
+            logger.info(f"[draft] Attempting RAG draft for case {case_id}")
+            draft = generate_draft_rag(case_id, db)
+            logger.info(f"[draft] RAG draft complete for case {case_id}")
+        except Exception as rag_exc:
+            logger.warning(f"[draft] RAG failed ({rag_exc}) — using mechanical fallback")
+            draft = build_draft(all_sub_docs, case_id, doc_dicts)
+
+        return draft
+    finally:
+        db.close()
+
+
+# ── Cases ─────────────────────────────────────────────────────────────────────
+
+@router.get("/cases", summary="List all unique case IDs with summary stats")
+def list_cases():
+    db: Session = SessionLocal()
+    try:
+        docs = db.query(Document).order_by(Document.created_at.desc()).all()
+        case_map: dict = {}
+        for d in docs:
+            cid = d.case_id
+            if cid not in case_map:
+                case_map[cid] = {
+                    "case_id": cid,
+                    "document_count": 0,
+                    "completed_count": 0,
+                    "processing_count": 0,
+                    "failed_count": 0,
+                    "total_pages": 0,
+                    "last_uploaded": d.created_at.isoformat() if d.created_at else None,
+                }
+            case_map[cid]["document_count"] += 1
+            case_map[cid]["total_pages"] += d.total_pages or 0
+            if d.status == "completed":
+                case_map[cid]["completed_count"] += 1
+            elif d.status == "failed":
+                case_map[cid]["failed_count"] += 1
+            elif d.status in ("processing", "uploaded"):
+                case_map[cid]["processing_count"] += 1
+
+        return {"cases": list(case_map.values())}
+    finally:
+        db.close()
+
+
+# ── Case detail ───────────────────────────────────────────────────────────────
+
+@router.get("/case/{case_id}", summary="Get all documents and sub-documents for a case")
+def get_case_detail(case_id: str):
+    from app.models import PipelineStageRun
+
+    db: Session = SessionLocal()
+    try:
+        docs = (
+            db.query(Document)
+            .filter(Document.case_id == case_id)
+            .order_by(Document.created_at.desc())
+            .all()
+        )
+        if not docs:
+            raise HTTPException(status_code=404, detail="Case not found")
+
+        result_docs = []
+        total_subdocs = 0
+
+        for d in docs:
+            # Get completed stages for this document
+            completed_stages = [
+                run.stage_name
+                for run in db.query(PipelineStageRun).filter(
+                    PipelineStageRun.document_id == d.id,
+                    PipelineStageRun.status == "completed"
+                ).all()
+            ]
+
+            subdocs = (
+                db.query(SubDocument)
+                .filter(SubDocument.document_id == d.id)
+                .order_by(SubDocument.start_page)
+                .all()
+            )
+            sd_list = []
+            for sd in subdocs:
+                content = (
+                    db.query(SubDocumentContent)
+                    .filter(SubDocumentContent.sub_document_id == sd.id)
+                    .first()
+                )
+                sd_list.append({
+                    "id": sd.id,
+                    "title": sd.title,
+                    "document_type": sd.document_type,
+                    "start_page": sd.start_page,
+                    "end_page": sd.end_page,
+                    "confidence_score": sd.confidence_score,
+                    "content": {
+                        "subject": content.subject if content else None,
+                        "purpose": content.purpose if content else None,
+                        "summary": content.summary if content else None,
+                        "main_content": content.main_content if content else None,
+                        "key_persons": json.loads(content.key_persons or "[]") if content else [],
+                        "key_dates": json.loads(content.key_dates or "[]") if content else [],
+                        "key_findings": json.loads(content.key_findings or "[]") if content else [],
+                        "key_actions": json.loads(content.key_actions or "[]") if content else [],
+                        "organizations": json.loads(content.organizations or "[]") if content else [],
+                    } if content else None,
+                })
+            total_subdocs += len(sd_list)
+            result_docs.append({
+                "document_id": d.id,
+                "file_name": d.file_name,
+                "original_name": d.original_name,
+                "status": d.status,
+                "current_stage": d.current_stage,
+                "total_pages": d.total_pages or 0,
+                "error_message": d.error_message,
+                "created_at": d.created_at.isoformat() if d.created_at else None,
+                "completed_stages": completed_stages,
+                "subdocument_count": len(sd_list),
+                "subdocuments": sd_list,
+            })
+
+        return {
+            "case_id": case_id,
+            "document_count": len(result_docs),
+            "total_subdocuments": total_subdocs,
+            "documents": result_docs,
+        }
+    finally:
+        db.close()

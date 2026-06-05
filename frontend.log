@@ -1,0 +1,51 @@
+
+> acb-investigation-system@1.0.0 dev
+> next dev
+
+  ▲ Next.js 14.2.35
+  - Local:        http://localhost:3000
+
+ ✓ Starting...
+ ✓ Ready in 2s
+ ✓ Compiled /middleware in 202ms (72 modules)
+ ○ Compiling /generate-report ...
+ ✓ Compiled /generate-report in 1268ms (589 modules)
+ GET /generate-report 200 in 1899ms
+ ○ Compiling /_not-found ...
+ ✓ Compiled /_not-found in 665ms (592 modules)
+ GET /.well-known/appspecific/com.chrome.devtools.json 404 in 875ms
+ ○ Compiling /_error ...
+ ✓ Compiled /_error in 4.5s (819 modules)
+ GET /generate-report 404 in 4716ms
+ ⚠ Fast Refresh had to perform a full reload. Read more: https://nextjs.org/docs/messages/fast-refresh-reload
+ GET /.well-known/appspecific/com.chrome.devtools.json 404 in 21ms
+ GET /generate-report 404 in 29ms
+ GET /.well-known/appspecific/com.chrome.devtools.json 404 in 12ms
+ ○ Compiling / ...
+ ✓ Compiled / in 581ms (835 modules)
+ GET / 200 in 851ms
+ GET /_next/static/css/app/layout.css?v=1780588124560 404 in 85ms
+ GET /_next/static/chunks/app-pages-internals.js 404 in 77ms
+ GET /_next/static/chunks/main-app.js?v=1780588124560 404 in 103ms
+ GET /.well-known/appspecific/com.chrome.devtools.json 404 in 76ms
+ GET /temples/e0000001-0000-0000-0000-000000000025 404 in 16ms
+ GET / 200 in 63ms
+ GET /_next/static/css/app/layout.css?v=1780588165658 404 in 42ms
+ GET /_next/static/chunks/main-app.js?v=1780588165658 404 in 56ms
+ GET /_next/static/chunks/app-pages-internals.js 404 in 53ms
+ GET /.well-known/appspecific/com.chrome.devtools.json 404 in 18ms
+ GET / 200 in 46ms
+ GET /_next/static/css/app/layout.css?v=1780588170721 404 in 28ms
+ GET /_next/static/chunks/main-app.js?v=1780588170721 404 in 27ms
+ GET /_next/static/chunks/app-pages-internals.js 404 in 26ms
+ ○ Compiling /view-reports ...
+ ✓ Compiled /view-reports in 1096ms (984 modules)
+ GET /view-reports 200 in 1391ms
+ GET /_next/static/css/app/layout.css?v=1780588174005 404 in 60ms
+ GET /_next/static/chunks/main-app.js?v=1780588174005 404 in 57ms
+ GET /_next/static/chunks/app-pages-internals.js 404 in 56ms
+ GET /_next/static/chunks/app/(main)/layout.js 404 in 56ms
+ GET /_next/static/css/app/layout.css?v=1780588174005 404 in 23ms
+ GET /.well-known/appspecific/com.chrome.devtools.json 404 in 29ms
+ GET /view-reports 200 in 68ms
+[?25h

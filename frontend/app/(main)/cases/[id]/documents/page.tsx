@@ -92,7 +92,7 @@ export default function DocumentsPage() {
       'image/png': ['.png'],
       'image/tiff': ['.tiff', '.tif'],
     },
-    maxSize: 20 * 1024 * 1024,
+    maxSize: 300 * 1024 * 1024,
   });
 
   async function processOCR(docId: string) {
@@ -163,7 +163,7 @@ export default function DocumentsPage() {
                 {isDragActive ? 'Drop files to upload' : 'Drag & drop files here'}
               </p>
               <p className="text-slate-500 text-sm mt-1">
-                Supports PDF, JPG, PNG, TIFF • Max 20MB per file
+                Supports PDF, JPG, PNG, TIFF • Max 300MB per file
               </p>
             </div>
             <button type="button" className="btn-primary">

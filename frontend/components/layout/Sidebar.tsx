@@ -5,7 +5,7 @@ import { usePathname } from 'next/navigation';
 import {
   Shield, LayoutDashboard, FolderOpen, FileText,
   BarChart3, Settings, LogOut, Cpu, ChevronRight,
-  Scale, BookOpen
+  Scale, BookOpen, FileOutput, FolderSearch
 } from 'lucide-react';
 
 interface NavItem {
@@ -19,7 +19,9 @@ const NAV_ITEMS: NavItem[] = [
   { href: '/dashboard', label: 'Dashboard', icon: <LayoutDashboard size={18} /> },
   { href: '/cases', label: 'Cases', icon: <FolderOpen size={18} />, badge: '5' },
   { href: '/draft-generator', label: 'Draft Generator', icon: <FileText size={18} /> },
-  { href: '/reports', label: 'Reports', icon: <BarChart3 size={18} /> },
+  { href: '/generate-report', label: 'Generate Report', icon: <FileOutput size={18} /> },
+  { href: '/view-reports', label: 'View Reports', icon: <FolderSearch size={18} /> },
+  { href: '/reports', label: 'Analytics', icon: <BarChart3 size={18} /> },
   { href: '/settings', label: 'Settings', icon: <Settings size={18} /> },
 ];
 
