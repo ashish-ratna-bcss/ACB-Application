@@ -61,7 +61,6 @@ export default function Sidebar() {
           </div>
           <span className="text-cyan-400 text-xs font-semibold">AI Engine Active</span>
         </div>
-        <div className="text-slate-500 text-xs mt-0.5">Claude 3.5 Sonnet Ready</div>
       </div>
 
       {/* Navigation */}
