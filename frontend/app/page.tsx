@@ -129,7 +129,7 @@ export default function LoginPage() {
                 border: "1px solid rgba(6,182,212,0.3)",
               }}
             >
-              <Cpu size={64} className="text-cyan-400" />
+              <img src="/Logo.png" alt="ACB" className="w-24 h-24 object-contain" />
             </div>
 
             <h1 className="text-4xl font-bold text-white leading-tight mb-4">
