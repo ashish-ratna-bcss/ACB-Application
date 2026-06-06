@@ -127,9 +127,9 @@ export default function DraftPage() {
         type: 'final_report',
         title: data.title || 'ACB Final Report',
         content,
-        status: 'draft',
+        status: 'generating',
         comments: [],
-        createdAt: new Date().toISOString(),
+        generatedAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };
 
