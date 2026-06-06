@@ -526,7 +526,7 @@ def generate_draft_rag(case_id: str, db, document_id: int | None = None) -> dict
                 {"role": "user",   "content": user_msg},
             ],
             format="json",
-            options={"temperature": 0, "num_ctx": 16384},
+            options={"temperature": 0},
         )
 
         raw = response.message.content or "{}"

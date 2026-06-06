@@ -613,7 +613,7 @@ export default function ViewReportsPage() {
   return (
     <div className="flex flex-col min-h-screen">
       <TopNav
-        title="View Reports"
+        title="Case Reports"
         subtitle="Select a case to review all uploaded documents and extracted sub-documents"
       />
 

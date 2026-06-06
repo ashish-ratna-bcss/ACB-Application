@@ -9,6 +9,7 @@ logger = logging.getLogger(__name__)
 
 import aiofiles
 from fastapi import APIRouter, BackgroundTasks, File, Form, HTTPException, Query, UploadFile
+from pydantic import BaseModel
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
@@ -451,7 +452,11 @@ def generate_draft(case_id: str):
         from app.config import PDF_UPLOAD_DIR
         from datetime import datetime
         logger.info(f"[draft] Generating RAG draft for case {case_id}")
-        draft = generate_draft_rag(case_id, db)
+        try:
+            draft = generate_draft_rag(case_id, db)
+        except Exception as exc:
+            logger.error(f"[draft] Generation failed: {exc}")
+            raise HTTPException(status_code=500, detail=str(exc))
         logger.info(f"[draft] RAG draft complete for case {case_id}")
 
         # Save draft to pdf-files/{case_id}/
@@ -466,6 +471,192 @@ def generate_draft(case_id: str):
             logger.warning(f"[draft] Failed to save draft file: {exc}")
 
         return JSONResponse(content=draft, headers={"Cache-Control": "no-store, no-cache, must-revalidate"})
+    finally:
+        db.close()
+
+
+# ── Dashboard Stats ───────────────────────────────────────────────────────────
+
+@router.get("/stats", summary="Aggregated dashboard statistics")
+def dashboard_stats():
+    from app.models import SubDocument, SubDocumentContent
+    from app.config import PDF_UPLOAD_DIR
+    db: Session = SessionLocal()
+    try:
+        docs = db.query(Document).all()
+        total_cases = len(set(d.case_id for d in docs))
+        total_docs = len(docs)
+        completed = sum(1 for d in docs if d.status == "completed")
+        processing = sum(1 for d in docs if d.status == "processing")
+        failed = sum(1 for d in docs if d.status == "failed")
+        total_pages = sum(d.total_pages or 0 for d in docs)
+        total_subdocs = db.query(SubDocument).count()
+
+        # Count saved draft reports
+        draft_count = sum(
+            len(list((PDF_UPLOAD_DIR / d.case_id).glob("draft_*.json")))
+            for d in docs
+            if (PDF_UPLOAD_DIR / d.case_id).exists()
+        )
+        draft_count = len(set(  # unique cases with drafts
+            d.case_id for d in docs
+            if (PDF_UPLOAD_DIR / d.case_id).exists()
+            and list((PDF_UPLOAD_DIR / d.case_id).glob("draft_*.json"))
+        ))
+
+        # Docs per month for chart (last 6 months)
+        from collections import defaultdict
+        monthly: dict = defaultdict(int)
+        for d in docs:
+            if d.created_at:
+                key = d.created_at.strftime("%b %Y")
+                monthly[key] += 1
+        monthly_list = [{"month": k, "docs": v} for k, v in sorted(monthly.items(), key=lambda x: x[0])][-6:]
+
+        # Pages per case (top 8)
+        case_pages: dict = defaultdict(int)
+        for d in docs:
+            case_pages[d.case_id] += d.total_pages or 0
+        top_cases = sorted(case_pages.items(), key=lambda x: x[1], reverse=True)[:8]
+        pages_chart = [{"case": k, "pages": v} for k, v in top_cases]
+
+        # Sub-document types distribution + avg confidence
+        from collections import Counter
+        from sqlalchemy import func as sqlfunc
+        subdocs = db.query(SubDocument).all()
+        type_counts = Counter(sd.document_type or "Unknown" for sd in subdocs)
+        subdoc_types = [{"name": k, "value": v} for k, v in type_counts.most_common(8)]
+        avg_confidence = db.query(sqlfunc.avg(SubDocument.confidence_score)).scalar() or 0
+
+        # Processing time per day (last 7 days)
+        from datetime import datetime, timedelta
+        cutoff = datetime.utcnow() - timedelta(days=7)
+        completed_docs = db.query(Document).filter(
+            Document.status == "completed",
+            Document.created_at >= cutoff
+        ).all()
+        daily_times: dict = defaultdict(list)
+        for d in completed_docs:
+            if d.created_at and d.updated_at:
+                secs = (d.updated_at - d.created_at).total_seconds()
+                if 0 < secs < 86400:
+                    daily_times[d.created_at.strftime("%d %b")].append(secs / 60)
+        processing_trend = [
+            {"day": day, "avg_min": round(sum(times) / len(times), 1), "docs": len(times)}
+            for day, times in sorted(daily_times.items())
+        ]
+
+        return {
+            "total_cases": total_cases,
+            "total_documents": total_docs,
+            "completed_documents": completed,
+            "processing_documents": processing,
+            "failed_documents": failed,
+            "total_pages": total_pages,
+            "total_subdocuments": total_subdocs,
+            "draft_reports": draft_count,
+            "monthly_uploads": monthly_list,
+            "pages_per_case": pages_chart,
+            "doc_status": [
+                {"name": "Completed", "value": completed},
+                {"name": "Processing", "value": processing},
+                {"name": "Failed", "value": failed},
+            ],
+            "subdoc_types": subdoc_types,
+            "avg_confidence": round(float(avg_confidence) * 100, 1),
+            "processing_trend": processing_trend,
+        }
+    finally:
+        db.close()
+
+
+# ── Chat ──────────────────────────────────────────────────────────────────────
+
+class ChatRequest(BaseModel):
+    question: str
+    case_id: str | None = None
+
+@router.post("/chat", summary="RAG-based chatbot over case documents")
+def chat(req: ChatRequest):
+    from app.config import OLLAMA_URL, OLLAMA_DRAFT_MODEL, OLLAMA_EMBED_MODEL, QDRANT_URL, QDRANT_COLLECTION
+    import os, ollama
+    from qdrant_client import QdrantClient
+    from qdrant_client.models import FieldCondition, Filter, MatchValue
+    from app.services.ai_draft_generator import _fetch_content_from_db
+    from app.database import SessionLocal
+
+    if not req.question.strip():
+        raise HTTPException(status_code=400, detail="Question cannot be empty")
+
+    db = SessionLocal()
+    try:
+        ollama_url  = os.getenv("OLLAMA_URL", OLLAMA_URL)
+        embed_model = os.getenv("OLLAMA_EMBED_MODEL", OLLAMA_EMBED_MODEL)
+        chat_model  = os.getenv("OLLAMA_DRAFT_MODEL", OLLAMA_DRAFT_MODEL)
+        qdrant_url  = os.getenv("QDRANT_URL", QDRANT_URL)
+
+        ollama_client = ollama.Client(host=ollama_url)
+        qdrant = QdrantClient(url=qdrant_url, timeout=10)
+
+        # Embed question
+        embed_resp = ollama_client.embeddings(model=embed_model, prompt=req.question)
+
+        # Build filter — scope to case if provided
+        must = []
+        if req.case_id:
+            must.append(FieldCondition(key="case_id", match=MatchValue(value=req.case_id)))
+        search_filter = Filter(must=must) if must else None
+
+        hits = qdrant.search(
+            collection_name=QDRANT_COLLECTION,
+            query_vector=embed_resp.embedding,
+            query_filter=search_filter,
+            limit=5,
+            with_payload=True,
+        )
+
+        if not hits:
+            return {"answer": "No relevant documents found. Please upload and process case documents first.", "sources": []}
+
+        # Fetch content for top hits
+        seen, sources, blocks = set(), [], []
+        for h in hits:
+            p = h.payload or {}
+            sd_id = p.get("sub_document_id")
+            if sd_id and sd_id not in seen:
+                seen.add(sd_id)
+                block = _fetch_content_from_db(db, p.get("document_id"), p.get("start_page"), sd_id)
+                if block:
+                    blocks.append(block)
+                    sources.append({
+                        "title": p.get("title", "Document"),
+                        "case_id": p.get("case_id", ""),
+                        "pages": f"{p.get('start_page','?')}–{p.get('end_page','?')}",
+                        "score": round(h.score, 3),
+                    })
+
+        context = "\n\n---\n\n".join(blocks[:4])
+
+        system_prompt = """You are an Anti-Corruption Bureau investigation assistant. Answer questions based ONLY on the provided case document content. Be concise and factual. If the answer is not in the source, say so clearly."""
+
+        user_msg = f"""SOURCE DOCUMENTS:\n{context}\n\nQUESTION: {req.question}\n\nAnswer based only on the source documents above."""
+
+        response = ollama_client.chat(
+            model=chat_model,
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user",   "content": user_msg},
+            ],
+            options={"temperature": 0.1},
+        )
+
+        return {
+            "answer": response.message.content,
+            "sources": sources[:3],
+        }
+    except Exception as exc:
+        logger.error(f"[chat] Error: {exc}")
+        raise HTTPException(status_code=500, detail=str(exc))
     finally:
         db.close()
 

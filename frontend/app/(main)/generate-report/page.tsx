@@ -457,7 +457,7 @@ export default function GenerateReportPage() {
 
   return (
     <div className="flex flex-col min-h-screen">
-      <TopNav title="Generate Report" subtitle="Upload a case document and extract structured sub-documents using AI" />
+      <TopNav title="Document Processor" subtitle="Upload a case document and extract structured sub-documents using AI" />
 
       <div className="p-6 animate-fade-in">
         <div className="max-w-6xl mx-auto">
@@ -470,7 +470,7 @@ export default function GenerateReportPage() {
                 <Sparkles size={24} className="text-cyan-400" />
               </div>
               <div>
-                <h2 className="text-white font-bold text-lg">AI Sub-Document Extractor</h2>
+                <h2 className="text-white font-bold text-lg">AI Document Processor</h2>
                 <p className="text-slate-400 text-sm mt-0.5">Upload a merged PDF. AI detects embedded sub-documents (letters, reports, statements, orders) and extracts structured content from each.</p>
               </div>
             </div>
@@ -612,7 +612,7 @@ export default function GenerateReportPage() {
                   ) : isBusy ? (
                     <><Loader2 size={18} className="animate-spin" /> Processing…</>
                   ) : (
-                    <><Sparkles size={18} /> Extract Sub-Documents<ChevronRight size={16} /></>
+                    <><Sparkles size={18} /> Extract Data<ChevronRight size={16} /></>
                   )}
                 </button>
               )}
@@ -685,7 +685,7 @@ export default function GenerateReportPage() {
                   <h3 className="text-lg font-bold text-slate-400 mb-2">Pipeline Preview</h3>
                   <p className="text-sm text-slate-400 max-w-xs mb-8">
                     {caseMode === "new"
-                      ? "Fill in Case ID, upload a merged PDF, and click Extract Sub-Documents."
+                      ? "Fill in Case ID, upload a merged PDF, and click Extract Data."
                       : "Select an existing case to see rerun options."}
                   </p>
                   <div className="w-full space-y-2 text-left">

@@ -9,8 +9,11 @@ env/
 dist/
 build/
 
-# Uploaded files
-pdf-files/
+# pdf-files — ignore uploads/images, track only draft JSON reports
+pdf-files/**
+!pdf-files/
+!pdf-files/**/
+!pdf-files/**/draft_*.json
 
 # Env
 .env
