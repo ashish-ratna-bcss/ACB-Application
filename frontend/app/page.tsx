@@ -94,24 +94,17 @@ export default function LoginPage() {
         />
 
         {/* Logo */}
-        <div className="relative z-10 animate-fade-in">
-          <div className="flex items-center gap-3 mb-2">
+        <div className="relative z-10 animate-fade-in flex items-center justify-between">
+          <div className="flex items-center gap-3">
             <div className="w-14 h-14 flex items-center justify-center">
-              <img
-                src="/acb_logo.webp"
-                alt="ACB Logo"
-                className="w-14 h-14 object-contain"
-              />
+              <img src="/acb_logo.webp" alt="ACB Logo" className="w-14 h-14 object-contain" />
             </div>
             <div>
-              <div className="text-white font-bold text-lg leading-tight">
-                Anti-Corruption Bureau
-              </div>
-              <div className="text-blue-300 text-xs">
-                Government of Telangana
-              </div>
+              <div className="text-white font-bold text-lg leading-tight">Anti-Corruption Bureau</div>
+              <div className="text-blue-300 text-xs">Government of Telangana</div>
             </div>
           </div>
+          <img src="/Logo.png" alt="Government Logo" className="w-40 h-30 object-contain" />
         </div>
 
         {/* Main content */}
@@ -122,14 +115,14 @@ export default function LoginPage() {
           {/* AI Brain illustration */}
           <div className="mb-8">
             <div
-              className="w-32 h-32 rounded-3xl flex items-center justify-center mx-auto mb-6 ai-glow-pulse"
+              className="w-48 h-48 rounded-3xl flex items-center justify-center mx-auto mb-6 ai-glow-pulse"
               style={{
                 background:
-                  "linear-gradient(135deg, rgba(6,182,212,0.2), rgba(37,99,235,0.2))",
+                  "linear-gradient(135deg, rgba(6,182,212,0.1), rgba(37,99,235,0.1))",
                 border: "1px solid rgba(6,182,212,0.3)",
               }}
             >
-              <img src="/Logo.png" alt="ACB" className="w-24 h-24 object-contain" />
+              <img src="/acb_logo.webp" alt="ACB Emblem" className="w-45 h-45 object-contain" />
             </div>
 
             <h1 className="text-4xl font-bold text-white leading-tight mb-4">
