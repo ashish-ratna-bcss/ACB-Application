@@ -47,21 +47,20 @@ export default function Sidebar() {
           <Shield size={18} className="text-white" />
         </div>
         <div className="min-w-0">
-          <div className="text-white font-bold text-sm leading-tight truncate">ACB</div>
-          <div className="text-slate-500 text-xs truncate">Investigation Platform</div>
+          <div className="text-slate-800 font-bold text-sm leading-tight truncate">ACB</div>
+          <div className="text-slate-400 text-xs truncate">Investigation Platform</div>
         </div>
       </div>
 
       {/* AI Indicator */}
-      <div className="mx-4 mt-4 mb-2 px-3 py-2.5 rounded-xl" style={{ background: 'rgba(6,182,212,0.1)', border: '1px solid rgba(6,182,212,0.15)' }}>
+      <div className="mx-4 mt-4 mb-2 px-3 py-2.5 rounded-xl" style={{ background: 'rgba(37,99,235,0.06)', border: '1px solid rgba(37,99,235,0.12)' }}>
         <div className="flex items-center gap-2">
           <div className="relative">
-            <Cpu size={14} className="text-cyan-400" />
-            <div className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-green-400 rounded-full border border-navy-900" />
+            <Cpu size={14} className="text-blue-500" />
+            <div className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-green-400 rounded-full border border-white" />
           </div>
-          <span className="text-cyan-400 text-xs font-semibold">AI Engine Active</span>
+          <span className="text-blue-600 text-xs font-semibold">AI Engine Active</span>
         </div>
-        <div className="text-slate-500 text-xs mt-0.5">Claude 3.5 Sonnet Ready</div>
       </div>
 
       {/* Navigation */}
@@ -75,7 +74,7 @@ export default function Sidebar() {
               {item.badge && (
                 <span
                   className="text-xs px-2 py-0.5 rounded-full font-semibold"
-                  style={{ background: 'rgba(37,99,235,0.2)', color: '#60A5FA' }}
+                  style={{ background: 'rgba(37,99,235,0.1)', color: '#2563EB' }}
                 >
                   {item.badge}
                 </span>
@@ -100,10 +99,8 @@ export default function Sidebar() {
       </nav>
 
       {/* User & Logout */}
-      <div className="p-4 border-t" style={{ borderColor: 'rgba(255,255,255,0.06)' }}>
-        <div
-          className="flex items-center gap-3 px-3 py-2.5 rounded-xl mb-2 cursor-pointer hover:bg-white/5 transition-colors"
-        >
+      <div className="p-4 border-t border-slate-200">
+        <div className="flex items-center gap-3 px-3 py-2.5 rounded-xl mb-2 cursor-pointer hover:bg-slate-50 transition-colors">
           <div
             className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 text-white text-xs font-bold"
             style={{ background: 'linear-gradient(135deg, #2563EB, #06B6D4)' }}
@@ -111,14 +108,14 @@ export default function Sidebar() {
             RK
           </div>
           <div className="min-w-0 flex-1">
-            <div className="text-white text-sm font-semibold truncate">Insp. Rajesh Kumar</div>
-            <div className="text-slate-500 text-xs truncate">Investigation Officer</div>
+            <div className="text-slate-800 text-sm font-semibold truncate">Insp. Rajesh Kumar</div>
+            <div className="text-slate-400 text-xs truncate">Investigation Officer</div>
           </div>
         </div>
         <button
           onClick={handleLogout}
-          className="nav-item w-full text-red-400 hover:text-red-300 hover:bg-red-500/10 transition-colors"
-          style={{ margin: 0, color: '#F87171' }}
+          className="nav-item w-full hover:bg-red-50 transition-colors"
+          style={{ margin: 0, color: '#EF4444' }}
         >
           <LogOut size={16} />
           <span className="text-sm">Sign Out</span>

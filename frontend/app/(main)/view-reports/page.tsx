@@ -436,6 +436,97 @@ function DocCard({ doc }: { doc: CaseDocument }) {
   );
 }
 
+// ── Draft section groups (mirrors backend SECTION_GROUPS order) ───────────────
+const DRAFT_SECTIONS = [
+  { num: "1",  label: "Introduction" },
+  { num: "2",  label: "Service Particulars of Accused Officer" },
+  { num: "3",  label: "Allegation in Brief" },
+  { num: "4",  label: "Complaint" },
+  { num: "5",  label: "Registration of FIR" },
+  { num: "6",  label: "Pre-Trap Proceedings" },
+  { num: "7",  label: "Post-Trap Proceedings" },
+  { num: "8",  label: "Oral Evidence" },
+  { num: "9",  label: "Documentary Evidence" },
+  { num: "10", label: "Analysis of Evidence" },
+  { num: "11", label: "Findings of Investigation" },
+  { num: "12", label: "Abstract of Findings & Recommendations" },
+  { num: "13", label: "Request for Prosecution Sanction" },
+  { num: "14", label: "Call Data Records" },
+  { num: "15", label: "Legal Precedents" },
+];
+
+function DraftProgressPanel({ current, total }: { current: number; total: number }) {
+  return (
+    <div className="mt-4 rounded-2xl overflow-hidden" style={{ border: "1px solid rgba(6,182,212,0.2)", background: "linear-gradient(135deg,#0F172A,#1E293B)" }}>
+      <div className="px-4 py-3 flex items-center gap-2 border-b" style={{ borderColor: "rgba(6,182,212,0.15)" }}>
+        <div className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse" />
+        <span className="text-cyan-400 text-sm font-bold">Generating Draft Report</span>
+        <span className="ml-auto text-slate-500 text-xs font-mono">{current}/{total} sections</span>
+      </div>
+      <div className="p-3 grid grid-cols-1 gap-1.5">
+        {DRAFT_SECTIONS.map((sec, idx) => {
+          const groupIdx = idx + 1;
+          const isCompleted = groupIdx < current;
+          const isActive    = groupIdx === current;
+          const isPending   = groupIdx > current;
+          return (
+            <div
+              key={sec.num}
+              className="flex items-center gap-3 px-3 py-2 rounded-xl transition-all"
+              style={{
+                background: isActive
+                  ? "linear-gradient(135deg,rgba(37,99,235,0.25),rgba(6,182,212,0.15))"
+                  : isCompleted
+                  ? "rgba(16,185,129,0.08)"
+                  : "rgba(255,255,255,0.02)",
+                border: isActive
+                  ? "1px solid rgba(6,182,212,0.4)"
+                  : isCompleted
+                  ? "1px solid rgba(16,185,129,0.2)"
+                  : "1px solid rgba(255,255,255,0.04)",
+                opacity: isPending ? 0.45 : 1,
+              }}
+            >
+              {/* Status icon */}
+              <div
+                className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0"
+                style={{
+                  background: isActive
+                    ? "rgba(6,182,212,0.2)"
+                    : isCompleted
+                    ? "rgba(16,185,129,0.15)"
+                    : "rgba(255,255,255,0.05)",
+                }}
+              >
+                {isCompleted && <CheckCircle2 size={14} className="text-emerald-400" />}
+                {isActive    && <Loader2 size={14} className="text-cyan-400 animate-spin" />}
+                {isPending   && <span className="text-slate-600 text-xs font-bold">{sec.num}</span>}
+              </div>
+              {/* Label */}
+              <div className="flex-1 min-w-0">
+                <div className={`text-sm font-medium truncate ${isCompleted ? "text-emerald-400" : isActive ? "text-cyan-300" : "text-slate-500"}`}>
+                  {sec.label}
+                </div>
+              </div>
+              {/* Right status tag */}
+              {isActive && (
+                <span className="text-xs font-semibold px-2 py-0.5 rounded-full" style={{ background: "rgba(6,182,212,0.15)", color: "#22D3EE" }}>
+                  Processing
+                </span>
+              )}
+              {isCompleted && (
+                <span className="text-xs font-semibold px-2 py-0.5 rounded-full" style={{ background: "rgba(16,185,129,0.15)", color: "#34D399" }}>
+                  Done
+                </span>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 // ── Main page ─────────────────────────────────────────────────────────────────
 
 export default function ViewReportsPage() {
@@ -914,9 +1005,7 @@ export default function ViewReportsPage() {
                     {draftLoading ? (
                       <>
                         <Loader2 size={14} className="animate-spin" />
-                        {draftProgress
-                          ? `Group ${draftProgress.current} / ${draftProgress.total}…`
-                          : "Starting…"}
+                        {draftProgress ? "Generating…" : "Starting…"}
                       </>
                     ) : (
                       <>
@@ -927,6 +1016,14 @@ export default function ViewReportsPage() {
                   </button>
                 </div>
               </div>
+
+              {/* Draft generation progress panel */}
+              {draftLoading && (
+                <DraftProgressPanel
+                  current={draftProgress?.current ?? 0}
+                  total={draftProgress?.total ?? DRAFT_SECTIONS.length}
+                />
+              )}
 
               {/* Document cards */}
               {caseDetail.documents.map((doc) => (

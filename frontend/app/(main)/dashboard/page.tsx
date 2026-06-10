@@ -152,18 +152,16 @@ export default function DashboardPage() {
       <div className="p-6 space-y-6 animate-fade-in">
 
         {/* Welcome banner */}
-        <div className="rounded-2xl p-6 text-white relative overflow-hidden"
-          style={{ background: 'linear-gradient(135deg, #0F172A 0%, #1E3A5F 50%, #1D4ED8 100%)' }}>
-          <div className="absolute inset-0 opacity-10"
-            style={{ backgroundImage: 'radial-gradient(circle at 80% 50%, rgba(6,182,212,0.4) 0%, transparent 60%)' }} />
-          <div className="relative z-10 flex items-center justify-between flex-wrap gap-4">
+        <div className="rounded-2xl p-6 relative overflow-hidden"
+          style={{ background: '#FFFFFF', border: '1px solid #E2E8F0', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
+          <div className="flex items-center justify-between flex-wrap gap-4">
             <div>
               <div className="flex items-center gap-2 mb-2">
                 <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
-                <span className="text-cyan-400 text-base font-medium">System Active</span>
+                <span className="text-green-600 text-base font-medium">System Active</span>
               </div>
-              <h2 className="text-2xl font-bold mb-1">ACB Investigation Platform</h2>
-              <p className="text-slate-300 text-base">
+              <h2 className="text-2xl font-bold mb-1 text-slate-800">ACB Investigation Platform</h2>
+              <p className="text-slate-500 text-base">
                 {stats?.total_cases} cases · {stats?.total_pages} pages processed · {stats?.draft_reports} draft reports
               </p>
             </div>
@@ -171,7 +169,7 @@ export default function DashboardPage() {
               <button onClick={() => router.push('/generate-report')} className="btn-primary">
                 <FileOutput size={15} /> Generate Report
               </button>
-              <button onClick={() => router.push('/view-reports')} className="btn-secondary text-white border-white/20 hover:bg-white/10">
+              <button onClick={() => router.push('/view-reports')} className="btn-secondary">
                 <ScrollText size={15} /> Case Reports
               </button>
             </div>
