@@ -19,3 +19,17 @@ ollama==0.4.4
 
 # Vector store
 qdrant-client==1.12.1
+
+# Speech transcription, translation, and diarization
+scipy
+numpy
+requests
+python-dotenv
+torch
+torchaudio
+pyannote.audio
+transformers
+IndicTransToolkit
+sacremoses
+sarvamai
+imageio-ffmpeg
