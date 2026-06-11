@@ -86,6 +86,9 @@ export default function SpeechPage() {
   const [recordedBlob, setRecordedBlob] = useState<Blob | null>(null);
   const [recordingUrl, setRecordingUrl] = useState('');
   const [result, setResult] = useState<SpeechResult | null>(null);
+  const [editedSegments, setEditedSegments] = useState<Segment[]>([]);
+  const [speakerNames, setSpeakerNames] = useState<string[]>([]);
+  const [editingSpeaker, setEditingSpeaker] = useState<string | null>(null);
   const [liveResult, setLiveResult] = useState<SpeechResult | null>(null);
   const [error, setError] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
@@ -253,6 +256,13 @@ export default function SpeechPage() {
       const filename = selectedFile?.name || 'recording.webm';
       const data = await callSpeechApi('transcribe', media, filename);
       setResult(data);
+      const segs = data.segments ? [...data.segments] : [];
+      setEditedSegments(segs);
+      const count = data.speaker_count || 0;
+      const fromSegs = [...new Set(segs.map(s => s.speaker).filter(Boolean))] as string[];
+      const generated = Array.from({ length: count }, (_, i) => `Speaker ${i + 1}`);
+      setSpeakerNames([...new Set([...fromSegs, ...generated])]);
+      setEditingSpeaker(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Speech processing failed.');
     } finally {
@@ -488,25 +498,122 @@ export default function SpeechPage() {
                   <p className="text-slate-900 whitespace-pre-wrap leading-7">{result.text}</p>
                 </div>
 
-                {Array.isArray(result.segments) && result.segments.length > 0 && result.diarization && !result.diarization_warning && (
-                  <div>
-                    <h3 className="text-lg font-bold text-slate-900 mb-3">Segments</h3>
-                    <div className="space-y-3">
-                      {result.segments.map((segment, index) => (
-                        <div key={segment.id ?? index} className="rounded-lg border border-slate-200 p-4 bg-white">
-                          <div className="flex flex-wrap items-center gap-2 mb-2 text-xs font-semibold text-slate-500">
-                            <span>{segment.speaker || 'Segment'}</span>
-                            <span>{formatTime(segment.start)} - {formatTime(segment.end)}</span>
-                          </div>
-                          {segment.original_text && (
-                            <p className="text-sm text-slate-500 mb-2 whitespace-pre-wrap">{segment.original_text}</p>
-                          )}
-                          <p className="text-slate-900 whitespace-pre-wrap">{segment.text}</p>
+                {editedSegments.length > 0 && result.diarization && !result.diarization_warning && (() => {
+                  const allSpeakers = speakerNames;
+
+                  const SPEAKER_COLORS: Record<string, { chip: string; active: string }> = {};
+                  const PALETTE = [
+                    { chip: 'bg-blue-50 text-blue-600 border-blue-200', active: 'bg-blue-600 text-white border-blue-600' },
+                    { chip: 'bg-purple-50 text-purple-600 border-purple-200', active: 'bg-purple-600 text-white border-purple-600' },
+                    { chip: 'bg-emerald-50 text-emerald-600 border-emerald-200', active: 'bg-emerald-600 text-white border-emerald-600' },
+                    { chip: 'bg-orange-50 text-orange-600 border-orange-200', active: 'bg-orange-600 text-white border-orange-600' },
+                  ];
+                  allSpeakers.forEach((sp, i) => { SPEAKER_COLORS[sp] = PALETTE[i % PALETTE.length]; });
+
+                  return (
+                    <div>
+                      {/* Speaker rename inputs */}
+                      <div className="mb-4 p-3 bg-slate-50 rounded-xl border border-slate-100">
+                        <div className="flex items-center justify-between mb-2">
+                        <div className="text-xs font-bold text-slate-500">RENAME SPEAKERS</div>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => {
+                              const data = editedSegments.map(s => ({
+                                speaker: s.speaker || 'Unknown',
+                                start: s.start,
+                                end: s.end,
+                                text: s.text,
+                                ...(s.original_text ? { original_text: s.original_text } : {}),
+                              }));
+                              const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+                              const url = URL.createObjectURL(blob);
+                              const a = document.createElement('a');
+                              a.href = url; a.download = 'transcript.json'; a.click();
+                              URL.revokeObjectURL(url);
+                            }}
+                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-600 text-white text-xs font-semibold hover:bg-blue-700 transition-colors"
+                          >
+                            ↓ Download JSON
+                          </button>
+                          <button
+                            onClick={() => {
+                              const data = editedSegments.map(s => ({
+                                speaker: s.speaker || 'Unknown',
+                                start: s.start,
+                                end: s.end,
+                                text: s.text,
+                                ...(s.original_text ? { original_text: s.original_text } : {}),
+                              }));
+                              navigator.clipboard.writeText(JSON.stringify(data, null, 2));
+                            }}
+                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-100 text-slate-700 text-xs font-semibold hover:bg-slate-200 transition-colors"
+                          >
+                            Copy JSON
+                          </button>
                         </div>
-                      ))}
+                      </div>
+                        <div className="flex flex-wrap gap-3">
+                          {allSpeakers.map((sp, i) => (
+                            <div key={sp} className="flex items-center gap-2">
+                              <span className={`px-2.5 py-1 rounded-full text-xs font-bold border ${SPEAKER_COLORS[sp]?.active}`}>{sp}</span>
+                              <span className="text-xs text-slate-400">→</span>
+                              <input
+                                key={sp}
+                                defaultValue={sp}
+                                placeholder={sp}
+                                className="border border-slate-200 rounded-lg px-2.5 py-1 text-sm w-32 outline-none focus:border-blue-400"
+                                onBlur={e => {
+                                  const newName = e.target.value.trim();
+                                  if (newName && newName !== sp) {
+                                    setEditedSegments(prev => prev.map(seg => seg.speaker === sp ? { ...seg, speaker: newName } : seg));
+                                    setSpeakerNames(prev => prev.map(s => s === sp ? newName : s));
+                                  }
+                                }}
+                                onKeyDown={e => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }}
+                              />
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div className="space-y-3">
+                        {editedSegments.map((segment, index) => {
+                          const colors = SPEAKER_COLORS[segment.speaker || ''] || PALETTE[0];
+                          return (
+                            <div key={segment.id ?? index} className={`rounded-xl border p-4 bg-white`}>
+                              <div className="flex flex-wrap items-center gap-2 mb-2.5">
+                                {/* Speaker chips — all speakers shown, active one highlighted */}
+                                {allSpeakers.map(sp => (
+                                  <button
+                                    key={sp}
+                                    onClick={() => {
+                                      if (sp !== segment.speaker) {
+                                        setEditedSegments(prev => prev.map((seg, i) => i === index ? { ...seg, speaker: sp } : seg));
+                                      }
+                                    }}
+                                    className={`px-2.5 py-0.5 rounded-full text-xs font-bold border transition-all ${
+                                      sp === segment.speaker
+                                        ? SPEAKER_COLORS[sp]?.active
+                                        : 'bg-white text-slate-400 border-slate-200 hover:border-slate-400 hover:text-slate-600'
+                                    }`}
+                                  >
+                                    {sp}
+                                  </button>
+                                ))}
+                                <span className="text-xs text-slate-400 ml-1">{formatTime(segment.start)} – {formatTime(segment.end)}</span>
+                              </div>
+                              {segment.original_text && (
+                                <p className="text-sm text-slate-500 mb-1.5 whitespace-pre-wrap">{segment.original_text}</p>
+                              )}
+                              <p className="text-slate-900 whitespace-pre-wrap leading-relaxed">{segment.text}</p>
+                            </div>
+                          );
+                        })}
+                      </div>
                     </div>
-                  </div>
-                )}
+                  );
+                })()}
               </div>
             )}
           </div>

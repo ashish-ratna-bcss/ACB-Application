@@ -13,6 +13,7 @@ frontend/data/
 
 # Uploaded files (user uploads — not tracked in git)
 frontend/public/uploads/
+backend/storage/stt_uploads/
 
 # Environment variables
 .env
