@@ -295,44 +295,9 @@ class _RecorderScreenState extends State<RecorderScreen> {
       return;
     }
 
-    // ── Auto-extract 5W-1H FIR fields from the transcript ───────────────────
-    _snack('Extracting FIR details from transcript…');
-    final extracted = await appState.extractFirDetails();
-    if (!mounted) return;
-    if (extracted == null) {
-      _snack('AI extraction unavailable — please review fields manually');
-      return;
-    }
-    final cd = context.read<CaseDetails>();
-    int filledCount = 0;
-    if ((extracted['sectionOfLaw'] ?? '').isNotEmpty) {
-      cd.sectionOfLaw = extracted['sectionOfLaw']!;
-      filledCount++;
-    }
-    if ((extracted['accusedName'] ?? '').isNotEmpty) {
-      cd.accusedName = extracted['accusedName']!;
-      filledCount++;
-    }
-    if ((extracted['complainantName'] ?? '').isNotEmpty) {
-      cd.complainantName = extracted['complainantName']!;
-      filledCount++;
-    }
-    if ((extracted['incidentDate'] ?? '').isNotEmpty) {
-      cd.incidentDate = extracted['incidentDate']!;
-      filledCount++;
-    }
-    if ((extracted['location'] ?? '').isNotEmpty) {
-      cd.location = extracted['location']!;
-      filledCount++;
-    }
-    if ((extracted['description'] ?? '').isNotEmpty) {
-      cd.description = extracted['description']!;
-      filledCount++;
-    }
-    cd.touch();
-    _snack(filledCount > 0
-        ? 'AI auto-filled $filledCount FIR field(s) — please review'
-        : 'AI could not extract FIR details — please fill manually');
+    _snack(_task == 'translate'
+        ? 'Translation complete — see the Result tab'
+        : 'Transcription complete — see the Result tab');
   }
 
   void _snack(String msg) {

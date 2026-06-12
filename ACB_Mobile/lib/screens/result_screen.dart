@@ -297,7 +297,7 @@ class _ResultScreenState extends State<ResultScreen> {
     final isTranslate = r.task == 'translate';
     final originalText = _originalText(r);
 
-    return Padding(
+    return SingleChildScrollView(
       padding: const EdgeInsets.fromLTRB(14, 8, 14, 96),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -430,28 +430,18 @@ class _ResultScreenState extends State<ResultScreen> {
           ),
           const SizedBox(height: 10),
 
-          // ─── Results body (uses all remaining space, no box) ───
-          Expanded(
-            child: SingleChildScrollView(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  if (isTranslate && originalText.isNotEmpty) ...[
-                    _textBox('Original Transcript', originalText, muted: true),
-                    const SizedBox(height: 12),
-                  ],
-                  _textBox(
-                      isTranslate ? 'Translated Text' : 'Transcript', r.text),
-                  if (_hasSpeakers) ...[
-                    const SizedBox(height: 16),
-                    if (_editMode) _renamePanel(),
-                    ..._buildSegments(),
-                  ],
-                  const SizedBox(height: 8),
-                ],
-              ),
-            ),
-          ),
+          // ─── Results body (grows with the text; whole tab scrolls) ───
+          if (isTranslate && originalText.isNotEmpty) ...[
+            _textBox('Original Transcript', originalText, muted: true),
+            const SizedBox(height: 12),
+          ],
+          _textBox(isTranslate ? 'Translated Text' : 'Transcript', r.text),
+          if (_hasSpeakers) ...[
+            const SizedBox(height: 16),
+            if (_editMode) _renamePanel(),
+            ..._buildSegments(),
+          ],
+          const SizedBox(height: 8),
         ],
       ),
     );
