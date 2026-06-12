@@ -69,6 +69,101 @@ function formatTime(value?: number) {
   return `${minutes}:${seconds}`;
 }
 
+// Build a true native .docx using the `docx` library and trigger a download.
+// Opens in Word / Google Docs / Pages and is fully editable.
+async function downloadWord(segments: Segment[], result: SpeechResult) {
+  const {
+    Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType,
+    Table, TableRow, TableCell, WidthType, BorderStyle,
+  } = await import('docx');
+
+  // Latin uses Calibri; the `cs` (complex-script) slot routes Indic characters
+  // — Telugu, Hindi/Devanagari, Tamil, etc. — to an Indic-capable font so they
+  // render correctly instead of as garbage. The renderer picks per character.
+  const FONT = { ascii: 'Calibri', hAnsi: 'Calibri', cs: 'Nirmala UI' } as const;
+  type RunOpts = { bold?: boolean; italics?: boolean; color?: string; size?: number };
+  const run = (text: string, opts: RunOpts = {}) => new TextRun({ text, font: FONT, ...opts });
+
+  const isTranslate = result.task === 'translate';
+  const title = isTranslate ? 'Speech Translation' : 'Speech Transcript';
+
+  const meta: string[] = [];
+  if (result.language_name) meta.push(`Source language: ${result.language_name}`);
+  if (isTranslate && result.target_language_name) meta.push(`Target language: ${result.target_language_name}`);
+  if (typeof result.speaker_count === 'number') meta.push(`Speakers: ${result.speaker_count}`);
+  meta.push(`Generated: ${new Date().toLocaleString()}`);
+
+  const ACCENT = '2563EB';
+  const cellBorders = {
+    top: { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' },
+    bottom: { style: BorderStyle.SINGLE, size: 4, color: 'E2E8F0' },
+    left: { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' },
+    right: { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' },
+  };
+
+  const rows = segments.map(s => new TableRow({
+    children: [
+      new TableCell({
+        width: { size: 28, type: WidthType.PERCENTAGE },
+        borders: cellBorders,
+        children: [
+          new Paragraph({ children: [run(s.speaker || 'Unknown', { bold: true })] }),
+          new Paragraph({
+            children: [run(`${formatTime(s.start)} – ${formatTime(s.end)}`, { size: 18, color: '888888' })],
+          }),
+        ],
+      }),
+      new TableCell({
+        width: { size: 72, type: WidthType.PERCENTAGE },
+        borders: cellBorders,
+        children: [
+          ...(s.original_text
+            ? [new Paragraph({ children: [run(s.original_text, { italics: true, color: '666666' })] })]
+            : []),
+          new Paragraph({ children: [run(s.text)] }),
+        ],
+      }),
+    ],
+  }));
+
+  const heading = (text: string) => new Paragraph({
+    heading: HeadingLevel.HEADING_2,
+    spacing: { before: 360, after: 120 },
+    border: { bottom: { style: BorderStyle.SINGLE, size: 12, color: ACCENT, space: 2 } },
+    children: [run(text, { color: ACCENT, bold: true })],
+  });
+
+  const doc = new Document({
+    sections: [{
+      children: [
+        new Paragraph({
+          heading: HeadingLevel.HEADING_1,
+          alignment: AlignmentType.LEFT,
+          children: [run(title, { bold: true })],
+        }),
+        new Paragraph({
+          spacing: { after: 240 },
+          children: [run(meta.join('   •   '), { color: '666666', size: 20 })],
+        }),
+        heading('Speaker-Separated Transcript'),
+        new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, rows }),
+        heading('Full Text'),
+        ...(result.text || '').split('\n').map(line =>
+          new Paragraph({ spacing: { after: 80 }, children: [run(line)] })
+        ),
+      ],
+    }],
+  });
+
+  const blob = await Packer.toBlob(doc);
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `${isTranslate ? 'translation' : 'transcript'}.docx`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 async function readApiError(response: Response) {
   const data = await response.json().catch(() => null);
   return data?.detail || data?.error || `Request failed with status ${response.status}`;
@@ -536,6 +631,21 @@ export default function SpeechPage() {
                           >
                             ↓ Download JSON
                           </button>
+                          {/* <button
+                            onClick={() => {
+                              const data = editedSegments.map(s => ({
+                                speaker: s.speaker || 'Unknown',
+                                start: s.start,
+                                end: s.end,
+                                text: s.text,
+                                ...(s.original_text ? { original_text: s.original_text } : {}),
+                              }));
+                              downloadWord(data, result);
+                            }}
+                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-600 text-white text-xs font-semibold hover:bg-indigo-700 transition-colors"
+                          >
+                            ↓ Download Word
+                          </button> */}
                           <button
                             onClick={() => {
                               const data = editedSegments.map(s => ({
