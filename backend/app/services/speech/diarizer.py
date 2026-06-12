@@ -102,10 +102,17 @@ class Diarizer:
             raise RuntimeError("HF_TOKEN not set in .env — required for pyannote models")
         device = "cuda" if _torch.cuda.is_available() else "cpu"
         print(f"[Diarizer] Loading pyannote/speaker-diarization-3.1 on {device}…")
-        self.pipeline = Pipeline.from_pretrained(
-            "pyannote/speaker-diarization-3.1",
-            token=HF_TOKEN,
-        )
+        # pyannote.audio <4 uses `use_auth_token`; newer versions renamed it to `token`.
+        try:
+            self.pipeline = Pipeline.from_pretrained(
+                "pyannote/speaker-diarization-3.1",
+                use_auth_token=HF_TOKEN,
+            )
+        except TypeError:
+            self.pipeline = Pipeline.from_pretrained(
+                "pyannote/speaker-diarization-3.1",
+                token=HF_TOKEN,
+            )
         if device == "cuda":
             self.pipeline = self.pipeline.to(_torch.device("cuda"))
         print("[Diarizer] Model loaded ✓")
