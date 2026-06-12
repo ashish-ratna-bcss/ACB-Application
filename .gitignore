@@ -3,6 +3,13 @@ node_modules/
 .pnp
 .pnp.js
 
+# Python virtual environments
+.venv/
+venv/
+env/
+__pycache__/
+*.pyc
+
 # Next.js build output
 .next/
 out/
