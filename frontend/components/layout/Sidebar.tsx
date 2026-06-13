@@ -5,7 +5,7 @@ import { usePathname } from 'next/navigation';
 import {
   Shield, LayoutDashboard, FolderOpen,
   Settings, LogOut, Cpu, ChevronRight,
-  Scale, BookOpen, FileOutput, FolderSearch
+  Scale, BookOpen, FileOutput, FolderSearch, AudioLines
 } from 'lucide-react';
 
 interface NavItem {
@@ -20,6 +20,7 @@ const NAV_ITEMS: NavItem[] = [
   { href: '/cases', label: 'Cases', icon: <FolderOpen size={18} />, badge: '5' },
   { href: '/generate-report', label: 'Document Processor', icon: <FileOutput size={18} /> },
   { href: '/view-reports', label: 'Case Reports', icon: <FolderSearch size={18} /> },
+  { href: '/speech', label: 'Speech Intelligence', icon: <AudioLines size={18} /> },
   { href: '/settings', label: 'Settings', icon: <Settings size={18} /> },
 ];
 

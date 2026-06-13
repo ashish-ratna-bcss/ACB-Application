@@ -42,7 +42,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.database import init_db
 from app.log_handler import register_handler
-from app.routers import pdf
+from app.routers import pdf, stt
 
 
 @asynccontextmanager
@@ -70,6 +70,7 @@ app.add_middleware(
 )
 
 app.include_router(pdf.router)
+app.include_router(stt.router)
 
 
 @app.get("/", tags=["Health"])

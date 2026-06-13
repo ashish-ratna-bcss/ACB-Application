@@ -3,6 +3,13 @@ node_modules/
 .pnp
 .pnp.js
 
+# Python virtual environments
+.venv/
+venv/
+env/
+__pycache__/
+*.pyc
+
 # Next.js build output
 .next/
 out/
@@ -13,6 +20,7 @@ frontend/data/
 
 # Uploaded files (user uploads — not tracked in git)
 frontend/public/uploads/
+backend/storage/stt_uploads/
 
 # Environment variables
 .env
