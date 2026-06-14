@@ -2,18 +2,21 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
+  Check,
   Languages,
   Loader2,
   Mic,
   Pause,
   Play,
   Radio,
+  Save,
   Square,
   UploadCloud,
   Users,
   Video,
 } from 'lucide-react';
 import { BACKEND_URL } from '@/lib/config';
+import CaseSearchSelect from '@/components/CaseSearchSelect';
 
 type Language = {
   code: string;
@@ -170,6 +173,9 @@ async function readApiError(response: Response) {
 }
 
 export default function SpeechPage() {
+  const [cases, setCases] = useState<{ id: string; caseNumber: string; title: string }[]>([]);
+  const [selectedCaseId, setSelectedCaseId] = useState('');
+  const [audioDescription, setAudioDescription] = useState('');
   const [languages, setLanguages] = useState<Language[]>(DEFAULT_LANGUAGES);
   const [backendStatus, setBackendStatus] = useState<'checking' | 'online' | 'offline'>('checking');
   const [sourceLanguage, setSourceLanguage] = useState('auto');
@@ -190,6 +196,7 @@ export default function SpeechPage() {
   const [isRecording, setIsRecording] = useState(false);
   const [liveEnabled, setLiveEnabled] = useState(true);
   const [duration, setDuration] = useState(0);
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -256,6 +263,13 @@ export default function SpeechPage() {
   useEffect(() => {
     recordingUrlRef.current = recordingUrl;
   }, [recordingUrl]);
+
+  useEffect(() => {
+    fetch("/api/cases")
+      .then((r) => r.json())
+      .then((data) => { if (Array.isArray(data)) setCases(data); })
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -375,10 +389,46 @@ export default function SpeechPage() {
     setRecordingUrl('');
   }
 
+  async function handleSave() {
+    if (!result || !selectedCaseId) return;
+    setSaveStatus('saving');
+    try {
+      const segments = editedSegments.length > 0 ? editedSegments : (result.segments ?? []);
+      const res = await fetch('/api/media-records', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          caseId: selectedCaseId,
+          fileName: selectedFile?.name ?? (recordedBlob ? 'live-recording.webm' : 'unknown'),
+          audioDescription: audioDescription || null,
+          language: result.language ?? null,
+          languageName: result.language_name ?? null,
+          targetLanguage: result.target_language ?? null,
+          targetLanguageName: result.target_language_name ?? null,
+          task: result.task ?? 'transcribe',
+          text: result.text ?? '',
+          originalText: result.original_text ?? null,
+          segments,
+          originalSegments: result.original_segments ?? [],
+          speakerCount: result.speaker_count ?? 0,
+          diarization: result.diarization ?? false,
+          processingTime: result.processing_time ?? null,
+        }),
+      });
+      if (!res.ok) throw new Error('Save failed');
+      setSaveStatus('saved');
+      setTimeout(() => setSaveStatus('idle'), 3000);
+    } catch {
+      setSaveStatus('error');
+      setTimeout(() => setSaveStatus('idle'), 4000);
+    }
+  }
+
   const activeMediaName = selectedFile?.name || (recordedBlob ? 'Recorded audio' : '');
   const statusColor = backendStatus === 'online' ? 'bg-emerald-500' : backendStatus === 'offline' ? 'bg-red-500' : 'bg-amber-400';
 
   return (
+    <>
     <main className="p-6 lg:p-8 max-w-7xl mx-auto">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between mb-6">
         <div>
@@ -399,6 +449,28 @@ export default function SpeechPage() {
         </div>
       </div>
 
+      <div className="content-card p-5 mb-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+          <label className="block text-sm font-semibold text-slate-700 mb-1.5">Case</label>
+          <CaseSearchSelect
+            cases={cases}
+            value={selectedCaseId}
+            onChange={setSelectedCaseId}
+            placeholder="— Select case —"
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-semibold text-slate-700 mb-1.5">Audio Description</label>
+          <input
+            type="text"
+            value={audioDescription}
+            onChange={(e) => setAudioDescription(e.target.value)}
+            placeholder="Brief description of the audio content…"
+            className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+        </div>
+      </div>
+
       {error && (
         <div className="mb-5 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
           {error}
@@ -406,8 +478,13 @@ export default function SpeechPage() {
       )}
 
       <div className="grid grid-cols-1 xl:grid-cols-[420px_1fr] gap-6">
-        <section className="content-card p-5 space-y-5">
-          <div>
+        <div className="flex flex-col gap-6 relative">
+          {!selectedCaseId && (
+            <div className="absolute inset-0 z-10 rounded-xl bg-white/70 backdrop-blur-[2px] flex items-center justify-center">
+              <p className="text-sm font-semibold text-slate-500">Select a case to continue</p>
+            </div>
+          )}
+          <section className="content-card p-5">
             <h2 className="text-lg font-bold text-slate-900 mb-3">Media Input</h2>
             <label className="block border-2 border-dashed border-slate-200 rounded-lg p-5 text-center hover:border-blue-300 hover:bg-blue-50/40 transition cursor-pointer">
               <UploadCloud className="mx-auto text-blue-500 mb-3" size={30} />
@@ -431,9 +508,9 @@ export default function SpeechPage() {
             {recordingUrl && (
               <audio controls src={recordingUrl} className="w-full mt-3" />
             )}
-          </div>
+          </section>
 
-          <div className="border-t border-slate-100 pt-5">
+          <section className="content-card p-5">
             <div className="flex items-center justify-between mb-3">
               <h2 className="text-lg font-bold text-slate-900">Live Recording</h2>
               <span className="text-sm font-semibold text-slate-500">{formatTime(duration)}</span>
@@ -467,9 +544,9 @@ export default function SpeechPage() {
                 Recording in progress
               </div>
             )}
-          </div>
+          </section>
 
-          <div className="border-t border-slate-100 pt-5 space-y-4">
+          <section className="content-card p-5 space-y-4">
             <h2 className="text-lg font-bold text-slate-900">Processing Options</h2>
             <div>
               <label className="text-sm font-semibold text-slate-700">Source language</label>
@@ -531,8 +608,8 @@ export default function SpeechPage() {
               {isProcessing ? <Loader2 size={17} className="animate-spin" /> : <Play size={17} />}
               {isProcessing ? 'Processing...' : 'Generate Result'}
             </button>
-          </div>
-        </section>
+          </section>
+        </div>
 
         <section className="space-y-6">
           {liveEnabled && liveResult?.text && (
@@ -730,5 +807,32 @@ export default function SpeechPage() {
         </section>
       </div>
     </main>
+
+    {result && selectedCaseId && (
+      <button
+        onClick={handleSave}
+        disabled={saveStatus === 'saving' || saveStatus === 'saved'}
+        className={`fixed bottom-6 right-6 z-50 flex items-center gap-2 px-5 py-3 rounded-xl font-semibold text-sm shadow-lg transition-all ${
+          saveStatus === 'saved'
+            ? 'bg-emerald-600 text-white cursor-default'
+            : saveStatus === 'error'
+            ? 'bg-red-600 text-white hover:bg-red-700'
+            : saveStatus === 'saving'
+            ? 'bg-blue-400 text-white cursor-not-allowed'
+            : 'bg-blue-600 text-white hover:bg-blue-700 active:scale-95'
+        }`}
+      >
+        {saveStatus === 'saving' ? (
+          <><Loader2 size={16} className="animate-spin" /> Saving…</>
+        ) : saveStatus === 'saved' ? (
+          <><Check size={16} /> Saved</>
+        ) : saveStatus === 'error' ? (
+          <><Save size={16} /> Error — Retry</>
+        ) : (
+          <><Save size={16} /> Save to Case</>
+        )}
+      </button>
+    )}
+    </>
   );
 }

@@ -1,7 +1,9 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-import { extractionStore, documentsStore, casesStore, logsStore } from '@/lib/store';
+import { extractionStore, documentsStore, logsStore } from '@/lib/store';
 import { performOCRExtraction } from '@/lib/ai-service';
+
+const BACKEND = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8000';
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
@@ -42,7 +44,9 @@ export async function POST(req: NextRequest) {
 
     if (!caseId) return NextResponse.json({ error: 'caseId required' }, { status: 400 });
 
-    const caseData = casesStore.getById(caseId);
+    const caseRes = await fetch(`${BACKEND}/cases/${caseId}`, { cache: 'no-store' }).catch(() => null);
+    const caseData = caseRes?.ok ? await caseRes.json() : null;
+
     const docs = documentsStore.getByCaseId(caseId);
     const docTexts = docs.map(d => d.extractedText || '').filter(Boolean);
 

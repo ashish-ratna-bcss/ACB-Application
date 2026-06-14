@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-import { logsStore, casesStore, draftsStore } from '@/lib/store';
+import { logsStore, draftsStore } from '@/lib/store';
+
+const BACKEND = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8000';
 
 export async function POST(req: NextRequest) {
   try {
@@ -8,7 +10,8 @@ export async function POST(req: NextRequest) {
     const userCookie = req.cookies.get('acb_user')?.value;
     const user = userCookie ? JSON.parse(userCookie) : { id: 'user-001', name: 'Insp. Rajesh Kumar' };
 
-    const caseData = casesStore.getById(caseId);
+    const caseRes = await fetch(`${BACKEND}/cases/${caseId}`, { cache: 'no-store' }).catch(() => null);
+    const caseData = caseRes?.ok ? await caseRes.json() : null;
 
     logsStore.add({
       caseId,
@@ -21,7 +24,14 @@ export async function POST(req: NextRequest) {
     });
 
     if (draftId) draftsStore.update(draftId, { status: 'finalized', exportedAt: new Date().toISOString() });
-    if (caseData) casesStore.update(caseId, { status: 'finalized' });
+
+    if (caseData) {
+      await fetch(`${BACKEND}/cases/${caseId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'finalized' }),
+      }).catch(() => {});
+    }
 
     return NextResponse.json({ success: true, filename });
   } catch {

@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 import aiofiles
 from fastapi import APIRouter, BackgroundTasks, File, Form, HTTPException, Query, UploadFile
 from pydantic import BaseModel
-from fastapi.responses import JSONResponse
+from fastapi.responses import FileResponse, JSONResponse
 from sqlalchemy.orm import Session
 
 from app.config import ALLOWED_CONTENT_TYPE, MAX_FILE_SIZE_MB, PDF_UPLOAD_DIR
@@ -384,10 +384,22 @@ def get_saved_draft(case_id: str):
     case_dir = PDF_UPLOAD_DIR / case_id
     if not case_dir.exists():
         raise HTTPException(status_code=404, detail="No saved draft found")
-    drafts = sorted(case_dir.glob("draft_*.json"), reverse=True)
+    drafts = sorted(case_dir.glob("draft_*.json"), key=lambda p: p.stat().st_mtime, reverse=True)
     if not drafts:
         raise HTTPException(status_code=404, detail="No saved draft found")
     return json.loads(drafts[0].read_text(encoding="utf-8"))
+
+
+@router.post("/save-draft/{case_id}", summary="Save updated draft (with HTML content) for a case")
+async def save_draft(case_id: str, body: dict):
+    from app.config import PDF_UPLOAD_DIR
+    import time
+    case_dir = PDF_UPLOAD_DIR / case_id
+    case_dir.mkdir(parents=True, exist_ok=True)
+    ts = int(time.time())
+    draft_path = case_dir / f"draft_{ts}.json"
+    draft_path.write_text(json.dumps(body, ensure_ascii=False, indent=2), encoding="utf-8")
+    return {"saved": True, "path": str(draft_path)}
 
 
 # ── Generate Draft ────────────────────────────────────────────────────────────
@@ -665,6 +677,7 @@ def chat(req: ChatRequest):
 
 @router.get("/cases", summary="List all unique case IDs with summary stats")
 def list_cases():
+    from app.models import Case
     db: Session = SessionLocal()
     try:
         docs = db.query(Document).order_by(Document.created_at.desc()).all()
@@ -680,6 +693,9 @@ def list_cases():
                     "failed_count": 0,
                     "total_pages": 0,
                     "last_uploaded": d.created_at.isoformat() if d.created_at else None,
+                    "title": None,
+                    "status": None,
+                    "accused_name": None,
                 }
             case_map[cid]["document_count"] += 1
             case_map[cid]["total_pages"] += d.total_pages or 0
@@ -690,9 +706,32 @@ def list_cases():
             elif d.status in ("processing", "uploaded"):
                 case_map[cid]["processing_count"] += 1
 
+        # Enrich with metadata from cases table
+        if case_map:
+            cases = db.query(Case).filter(Case.id.in_(list(case_map.keys()))).all()
+            for c in cases:
+                if c.id in case_map:
+                    case_map[c.id]["title"] = c.title
+                    case_map[c.id]["status"] = c.status
+                    case_map[c.id]["accused_name"] = c.accused_name
+
         return {"cases": list(case_map.values())}
     finally:
         db.close()
+
+
+# ── File serving ─────────────────────────────────────────────────────────────
+
+@router.get("/file/{case_id}/{file_name}", summary="Serve the original PDF for inline viewing")
+def serve_pdf(case_id: str, file_name: str):
+    pdf_path = PDF_UPLOAD_DIR / case_id / file_name
+    if not pdf_path.exists():
+        raise HTTPException(status_code=404, detail="File not found")
+    return FileResponse(
+        path=str(pdf_path),
+        media_type="application/pdf",
+        headers={"Content-Disposition": f"inline; filename={file_name}"},
+    )
 
 
 # ── Case detail ───────────────────────────────────────────────────────────────

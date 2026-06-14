@@ -588,7 +588,7 @@ def _assemble_output(filled: dict[str, str], case_id: str) -> dict:
         "office":       "Office of the Director General,\nAnti-Corruption Bureau,\nTG, Hyderabad.",
         "case_name":    case_id,
         "date":         today,
-        "doc_title":    "CIRCULAR MEMORANDUM",
+        "doc_title":    "GOVERNMENT OF TELANGANA ANTI-CORRUPTION BUREAU",
         "sub":          "Sub:-\tFinal Reports – Drafting of Final Reports in D.Es., R.Es. and R.Cs. – Instructions – Issued.",
         "case_number":  case_id,
         "sections":     sections,

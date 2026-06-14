@@ -79,6 +79,7 @@ export default function NewCasePage() {
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [errors, setErrors] = useState<Partial<FormData>>({});
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [activeSection, setActiveSection] = useState("case");
 
   function update(field: keyof FormData, value: string) {
@@ -107,7 +108,26 @@ export default function NewCasePage() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!validate()) return;
+    setErrorMsg(null);
+    if (!validate()) {
+      // Check which sections have errors and guide user
+      const newErrors: Partial<FormData> = {};
+      if (!form.title.trim()) newErrors.title = "required";
+      if (!form.firNumber.trim()) newErrors.firNumber = "required";
+      if (!form.accusedName.trim()) newErrors.accusedName = "required";
+      if (!form.accusedDesignation.trim()) newErrors.accusedDesignation = "required";
+      if (!form.accusedDepartment.trim()) newErrors.accusedDepartment = "required";
+
+      const missingSections: string[] = [];
+      if (newErrors.title || newErrors.firNumber) missingSections.push("Case Information");
+      if (newErrors.accusedName || newErrors.accusedDesignation || newErrors.accusedDepartment) missingSections.push("Accused Details");
+
+      if (missingSections.length > 0) {
+        setErrorMsg(`Required fields missing in: ${missingSections.join(", ")}`);
+        setActiveSection(missingSections[0] === "Case Information" ? "case" : "accused");
+      }
+      return;
+    }
     setLoading(true);
     try {
       const res = await fetch("/api/cases", {
@@ -122,7 +142,11 @@ export default function NewCasePage() {
       if (res.ok) {
         setSuccess(true);
         setTimeout(() => router.push(`/cases/${data.id}`), 1500);
+      } else {
+        setErrorMsg(data?.detail || data?.error || `Server error (${res.status})`);
       }
+    } catch (err) {
+      setErrorMsg("Network error — backend unreachable");
     } finally {
       setLoading(false);
     }
@@ -179,6 +203,12 @@ export default function NewCasePage() {
             </button>
           ))}
         </div>
+
+        {errorMsg && (
+          <div className="mb-4 px-4 py-3 rounded-xl bg-red-50 border border-red-300 text-red-700 text-sm flex items-center gap-2">
+            <span className="font-semibold">⚠</span> {errorMsg}
+          </div>
+        )}
 
         <form onSubmit={handleSubmit}>
           <div className="space-y-4">

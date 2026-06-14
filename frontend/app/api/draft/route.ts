@@ -1,8 +1,10 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-import { draftsStore, casesStore, extractionStore, logsStore } from '@/lib/store';
+import { draftsStore, extractionStore, logsStore } from '@/lib/store';
 import { generateDraft } from '@/lib/ai-service';
 import type { DraftType } from '@/lib/types';
+
+const BACKEND = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8000';
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
@@ -18,8 +20,9 @@ export async function POST(req: NextRequest) {
     const userCookie = req.cookies.get('acb_user')?.value;
     const user = userCookie ? JSON.parse(userCookie) : { id: 'user-001', name: 'Insp. Rajesh Kumar' };
 
-    const caseData = casesStore.getById(caseId);
-    if (!caseData) return NextResponse.json({ error: 'Case not found' }, { status: 404 });
+    const caseRes = await fetch(`${BACKEND}/cases/${caseId}`, { cache: 'no-store' });
+    if (!caseRes.ok) return NextResponse.json({ error: 'Case not found' }, { status: 404 });
+    const caseData = await caseRes.json();
 
     const extraction = extractionStore.getByCaseId(caseId);
 

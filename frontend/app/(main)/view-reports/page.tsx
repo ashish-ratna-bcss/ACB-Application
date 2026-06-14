@@ -29,8 +29,11 @@ import {
   ScrollText,
   Sparkles,
   DatabaseZap,
+  Mic,
+  Radio,
 } from "lucide-react";
 import type { DraftReport } from "@/components/DraftReportModal";
+import CaseSearchSelect from "@/components/CaseSearchSelect";
 
 const DraftReportModal = dynamic(
   () => import("@/components/DraftReportModal"),
@@ -47,6 +50,14 @@ interface CaseSummary {
   failed_count: number;
   total_pages: number;
   last_uploaded: string | null;
+}
+
+interface AllCaseItem {
+  id: string;
+  caseNumber: string;
+  title: string;
+  type: string;
+  status: string;
 }
 
 interface SubDocContent {
@@ -89,6 +100,34 @@ interface CaseDetail {
   document_count: number;
   total_subdocuments: number;
   documents: CaseDocument[];
+}
+
+interface MediaSegment {
+  speaker?: string;
+  start?: number;
+  end?: number;
+  text: string;
+  original_text?: string;
+}
+
+interface MediaRecord {
+  id: string;
+  caseId: string;
+  fileName: string | null;
+  audioDescription: string | null;
+  language: string | null;
+  languageName: string | null;
+  targetLanguage: string | null;
+  targetLanguageName: string | null;
+  task: string | null;
+  text: string | null;
+  originalText: string | null;
+  segments: MediaSegment[];
+  originalSegments: MediaSegment[];
+  speakerCount: number;
+  diarization: boolean;
+  processingTime: number | null;
+  createdAt: string | null;
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -436,6 +475,130 @@ function DocCard({ doc }: { doc: CaseDocument }) {
   );
 }
 
+// ── Media record card ─────────────────────────────────────────────────────────
+
+function formatTime(v?: number | null) {
+  if (typeof v !== "number") return "00:00";
+  const m = Math.floor(v / 60).toString().padStart(2, "0");
+  const s = Math.floor(v % 60).toString().padStart(2, "0");
+  return `${m}:${s}`;
+}
+
+function MediaRecordCard({ rec, index }: { rec: MediaRecord; index: number }) {
+  const [open, setOpen] = useState(false);
+  const isTranslate = rec.task === "translate";
+
+  return (
+    <div className="rounded-xl overflow-hidden border border-slate-200 bg-white shadow-sm">
+      {/* Header */}
+      <div
+        className="p-4 flex items-start gap-3 cursor-pointer hover:bg-slate-50 transition-colors"
+        onClick={() => setOpen((o) => !o)}
+        style={{
+          background: open
+            ? "linear-gradient(135deg,#F0F9FF,#EFF6FF)"
+            : "linear-gradient(135deg,#F8FAFC,#F1F5F9)",
+        }}
+      >
+        <div
+          className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 text-white text-xs font-bold flex-shrink-0"
+          style={{ background: "linear-gradient(135deg,#7C3AED,#2563EB)" }}
+        >
+          {index + 1}
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="flex flex-wrap items-center gap-2 mb-1">
+            <h5 className="text-sm font-bold text-slate-800 truncate">
+              {rec.audioDescription || rec.fileName || "Untitled recording"}
+            </h5>
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-violet-100 text-violet-700 flex-shrink-0">
+              <Radio size={9} /> {isTranslate ? "Translated" : "Transcribed"}
+            </span>
+            {rec.diarization && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-blue-50 text-blue-600 flex-shrink-0">
+                <Users size={9} /> {rec.speakerCount} speaker{rec.speakerCount !== 1 ? "s" : ""}
+              </span>
+            )}
+          </div>
+          <div className="flex flex-wrap items-center gap-3 text-xs text-slate-400">
+            {rec.languageName && <span>{rec.languageName}</span>}
+            {isTranslate && rec.targetLanguageName && (
+              <><span>·</span><span>→ {rec.targetLanguageName}</span></>
+            )}
+            {rec.fileName && rec.audioDescription && (
+              <><span>·</span><span className="truncate max-w-[180px]">{rec.fileName}</span></>
+            )}
+            {rec.processingTime != null && (
+              <><span>·</span><span>{rec.processingTime.toFixed(1)}s</span></>
+            )}
+            {rec.createdAt && (
+              <><span>·</span><span>{fmtDate(rec.createdAt)}</span></>
+            )}
+          </div>
+        </div>
+        <ChevronRight
+          size={14}
+          className={`text-slate-400 flex-shrink-0 transition-transform duration-200 ${open ? "rotate-90" : ""}`}
+        />
+      </div>
+
+      {/* Text preview always visible */}
+      {rec.text && (
+        <div className="px-4 py-2.5 text-xs text-slate-600 leading-relaxed border-t border-slate-100 bg-slate-50/60 line-clamp-2">
+          {rec.text}
+        </div>
+      )}
+
+      {/* Expanded */}
+      {open && (
+        <div className="border-t border-slate-100 px-4 pb-5 pt-3 space-y-4">
+          {/* Full transcript */}
+          <div>
+            <div className="text-xs font-semibold text-slate-400 uppercase tracking-widest mb-2 flex items-center gap-1">
+              <ScrollText size={10} /> Full Transcript
+            </div>
+            <div
+              className="rounded-lg p-3 text-xs text-slate-700 leading-relaxed whitespace-pre-wrap"
+              style={{ background: "#F8FAFC", border: "1px solid #E2E8F0", maxHeight: 240, overflowY: "auto" }}
+            >
+              {rec.text || "—"}
+            </div>
+          </div>
+
+          {/* Segments */}
+          {rec.segments.length > 0 && (
+            <div>
+              <div className="text-xs font-semibold text-slate-400 uppercase tracking-widest mb-2 flex items-center gap-1">
+                <Users size={10} /> Speaker Segments ({rec.segments.length})
+              </div>
+              <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
+                {rec.segments.map((seg, i) => (
+                  <div key={i} className="rounded-lg border border-slate-100 bg-slate-50 p-3">
+                    <div className="flex items-center gap-2 mb-1">
+                      {seg.speaker && (
+                        <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-violet-100 text-violet-700">
+                          {seg.speaker}
+                        </span>
+                      )}
+                      <span className="text-xs text-slate-400">
+                        {formatTime(seg.start)} – {formatTime(seg.end)}
+                      </span>
+                    </div>
+                    {seg.original_text && (
+                      <p className="text-xs text-slate-400 italic mb-0.5">{seg.original_text}</p>
+                    )}
+                    <p className="text-xs text-slate-700 leading-relaxed">{seg.text}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Draft section groups (mirrors backend SECTION_GROUPS order) ───────────────
 const DRAFT_SECTIONS = [
   { num: "1",  label: "Introduction" },
@@ -530,9 +693,9 @@ function DraftProgressPanel({ current, total }: { current: number; total: number
 // ── Main page ─────────────────────────────────────────────────────────────────
 
 export default function ViewReportsPage() {
-  const [cases, setCases] = useState<CaseSummary[]>([]);
+  const [cases, setCases] = useState<AllCaseItem[]>([]);
+  const [caseStats, setCaseStats] = useState<Record<string, CaseSummary>>({});
   const [selectedCase, setSelectedCase] = useState<string>("");
-  const [dropOpen, setDropOpen] = useState(false);
   const [caseDetail, setCaseDetail] = useState<CaseDetail | null>(null);
   const [loading, setLoading] = useState(false);
   const [casesLoading, setCasesLoading] = useState(true);
@@ -547,22 +710,32 @@ export default function ViewReportsPage() {
   const [savedDraftExists, setSavedDraftExists] = useState(false);
   const [reindexing, setReindexing] = useState(false);
   const [reindexMsg, setReindexMsg] = useState("");
+  const [mediaRecords, setMediaRecords] = useState<MediaRecord[]>([]);
+  const [mediaRecordsLoading, setMediaRecordsLoading] = useState(false);
+  const [mediaOpen, setMediaOpen] = useState(true);
 
-  // Load case list on mount
+  // Load case list on mount — all cases from SQLite + doc stats from pdf/cases
   useEffect(() => {
-    fetch(`${BACKEND_URL}/pdf/cases`)
-      .then((r) => r.json())
-      .then((d) => setCases(d.cases || []))
+    Promise.all([
+      fetch("/api/cases").then((r) => r.json()),
+      fetch(`${BACKEND_URL}/pdf/cases`).then((r) => r.json()).catch(() => ({ cases: [] })),
+    ])
+      .then(([allCases, pdfData]) => {
+        setCases(Array.isArray(allCases) ? allCases : []);
+        const statsMap: Record<string, CaseSummary> = {};
+        for (const s of (pdfData.cases || [])) statsMap[s.case_id] = s;
+        setCaseStats(statsMap);
+      })
       .catch(() => setError("Failed to load cases"))
       .finally(() => setCasesLoading(false));
   }, []);
 
   function selectCase(cid: string) {
     setSelectedCase(cid);
-    setDropOpen(false);
     setCaseDetail(null);
     setError("");
     setSavedDraftExists(false);
+    setMediaRecords([]);
     setLoading(true);
     fetch(`${BACKEND_URL}/pdf/case/${cid}`)
       .then((r) => r.json())
@@ -571,10 +744,15 @@ export default function ViewReportsPage() {
       .finally(() => setLoading(false));
     // Check if saved draft exists
     fetch(`http://localhost:8000/pdf/saved-draft/${cid}`, { cache: "no-store" })
-      .then((r) => {
-        if (r.ok) setSavedDraftExists(true);
-      })
+      .then((r) => { if (r.ok) setSavedDraftExists(true); })
       .catch(() => {});
+    // Load media records
+    setMediaRecordsLoading(true);
+    fetch(`${BACKEND_URL}/media-records?case_id=${encodeURIComponent(cid)}`, { cache: "no-store" })
+      .then((r) => r.json())
+      .then((d) => setMediaRecords(Array.isArray(d) ? d : []))
+      .catch(() => setMediaRecords([]))
+      .finally(() => setMediaRecordsLoading(false));
   }
 
   async function viewSavedDraft() {
@@ -594,6 +772,16 @@ export default function ViewReportsPage() {
 
   function refresh() {
     if (selectedCase) selectCase(selectedCase);
+  }
+
+  function refreshMedia() {
+    if (!selectedCase) return;
+    setMediaRecordsLoading(true);
+    fetch(`${BACKEND_URL}/media-records?case_id=${encodeURIComponent(selectedCase)}`, { cache: "no-store" })
+      .then((r) => r.json())
+      .then((d) => setMediaRecords(Array.isArray(d) ? d : []))
+      .catch(() => setMediaRecords([]))
+      .finally(() => setMediaRecordsLoading(false));
   }
 
   async function reindexCase() {
@@ -648,7 +836,8 @@ export default function ViewReportsPage() {
     }
   }
 
-  const selected = cases.find((c) => c.case_id === selectedCase);
+  const selected = cases.find((c) => c.id === selectedCase);
+  const selectedStats = selectedCase ? caseStats[selectedCase] : undefined;
 
   function downloadReport() {
     if (!caseDetail) return;
@@ -739,121 +928,20 @@ export default function ViewReportsPage() {
               </div>
             </div>
 
-            {/* Dropdown */}
-            <div className="relative">
-              <button
-                onClick={() => setDropOpen((o) => !o)}
-                disabled={casesLoading}
-                className="w-full flex items-center justify-between px-4 py-3.5 rounded-xl text-sm font-semibold transition-all"
-                style={{
-                  background: "rgba(255,255,255,0.07)",
-                  border: dropOpen
-                    ? "1.5px solid rgba(6,182,212,0.6)"
-                    : "1.5px solid rgba(255,255,255,0.12)",
-                  color: selectedCase ? "white" : "#94A3B8",
-                  boxShadow: dropOpen
-                    ? "0 0 0 3px rgba(6,182,212,0.12)"
-                    : "none",
-                }}
-              >
-                <span className="flex items-center gap-2">
-                  {casesLoading ? (
-                    <>
-                      <Loader2
-                        size={15}
-                        className="animate-spin text-cyan-400"
-                      />{" "}
-                      Loading cases…
-                    </>
-                  ) : selectedCase ? (
-                    <>
-                      <span className="w-2 h-2 rounded-full bg-cyan-400 inline-block" />{" "}
-                      Case {selectedCase}
-                    </>
-                  ) : (
-                    "— Select a case —"
-                  )}
-                </span>
-                <ChevronDown
-                  size={16}
-                  className={`text-slate-400 transition-transform duration-200 ${dropOpen ? "rotate-180" : ""}`}
-                />
-              </button>
-
-              {dropOpen && cases.length > 0 && (
-                <div
-                  className="absolute z-50 top-full left-0 right-0 mt-2 rounded-xl overflow-hidden shadow-2xl"
-                  style={{
-                    background: "#1E293B",
-                    border: "1px solid rgba(6,182,212,0.2)",
-                    maxHeight: 320,
-                    overflowY: "auto",
-                  }}
-                >
-                  {cases.map((c) => (
-                    <button
-                      key={c.case_id}
-                      onClick={() => selectCase(c.case_id)}
-                      className="w-full flex items-center justify-between px-4 py-3 text-left text-sm hover:bg-white/5 transition-colors border-b border-white/5 last:border-0"
-                      style={{
-                        color:
-                          selectedCase === c.case_id ? "#06B6D4" : "#E2E8F0",
-                      }}
-                    >
-                      <div className="flex items-center gap-3">
-                        <div
-                          className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 text-xs font-bold text-white"
-                          style={{
-                            background:
-                              "linear-gradient(135deg,#2563EB,#06B6D4)",
-                          }}
-                        >
-                          {c.case_id.slice(0, 2).toUpperCase()}
-                        </div>
-                        <div>
-                          <div className="font-semibold">Case {c.case_id}</div>
-                          <div className="text-xs text-slate-500">
-                            {c.document_count} doc
-                            {c.document_count !== 1 ? "s" : ""} ·{" "}
-                            {c.total_pages} pages · uploaded{" "}
-                            {fmtDate(c.last_uploaded)}
-                          </div>
-                        </div>
-                      </div>
-                      <div className="flex gap-1.5 flex-shrink-0">
-                        {c.completed_count > 0 && (
-                          <span className="text-xs px-2 py-0.5 rounded-full bg-green-500/20 text-green-400 font-semibold">
-                            {c.completed_count} done
-                          </span>
-                        )}
-                        {c.processing_count > 0 && (
-                          <span className="text-xs px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-400 font-semibold">
-                            {c.processing_count} running
-                          </span>
-                        )}
-                        {c.failed_count > 0 && (
-                          <span className="text-xs px-2 py-0.5 rounded-full bg-red-500/20 text-red-400 font-semibold">
-                            {c.failed_count} failed
-                          </span>
-                        )}
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              )}
-
-              {dropOpen && cases.length === 0 && !casesLoading && (
-                <div
-                  className="absolute z-50 top-full left-0 right-0 mt-2 rounded-xl p-6 text-center text-slate-400 text-sm"
-                  style={{
-                    background: "#1E293B",
-                    border: "1px solid rgba(255,255,255,0.1)",
-                  }}
-                >
-                  No cases found. Upload a PDF first.
-                </div>
-              )}
-            </div>
+            {/* Searchable case dropdown */}
+            {casesLoading ? (
+              <div className="flex items-center gap-2 text-slate-400 text-sm px-1">
+                <Loader2 size={15} className="animate-spin text-cyan-400" /> Loading cases…
+              </div>
+            ) : (
+              <CaseSearchSelect
+                cases={cases}
+                value={selectedCase}
+                onChange={(id) => { if (id) selectCase(id); else { setSelectedCase(""); } }}
+                placeholder="— Select a case —"
+                dark
+              />
+            )}
 
             {/* Case stat strip */}
             {selected && (
@@ -861,17 +949,17 @@ export default function ViewReportsPage() {
                 {[
                   {
                     label: "Documents",
-                    value: selected.document_count,
+                    value: selectedStats?.document_count ?? "—",
                     color: "text-cyan-400",
                   },
                   {
                     label: "Completed",
-                    value: selected.completed_count,
+                    value: selectedStats?.completed_count ?? "—",
                     color: "text-green-400",
                   },
                   {
                     label: "Total Pages",
-                    value: selected.total_pages,
+                    value: selectedStats?.total_pages ?? "—",
                     color: "text-blue-400",
                   },
                   {
@@ -1029,6 +1117,78 @@ export default function ViewReportsPage() {
               {caseDetail.documents.map((doc) => (
                 <DocCard key={doc.document_id} doc={doc} />
               ))}
+
+              {/* ── Media Records panel ── */}
+              <div
+                className="rounded-2xl overflow-hidden shadow-sm"
+                style={{ border: "1px solid #E2E8F0" }}
+              >
+                {/* Panel header */}
+                <div
+                  className="p-5 flex items-center gap-4 cursor-pointer"
+                  onClick={() => setMediaOpen((o) => !o)}
+                  style={{
+                    background: "linear-gradient(135deg,#2E1065,#1E1B4B)",
+                    borderBottom: mediaOpen ? "1px solid rgba(139,92,246,0.2)" : "none",
+                  }}
+                >
+                  <div
+                    className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0"
+                    style={{
+                      background: "rgba(139,92,246,0.15)",
+                      border: "1px solid rgba(139,92,246,0.25)",
+                    }}
+                  >
+                    <Mic size={20} className="text-violet-400" />
+                  </div>
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2">
+                      <h4 className="text-white font-bold text-sm">Media Records</h4>
+                      <span
+                        className="text-xs px-2 py-0.5 rounded-full font-semibold"
+                        style={{ background: "rgba(139,92,246,0.2)", color: "#A78BFA" }}
+                      >
+                        {mediaRecordsLoading ? "…" : mediaRecords.length}
+                      </span>
+                    </div>
+                    <p className="text-slate-400 text-xs mt-0.5">
+                      Speech transcriptions and diarization records saved to this case
+                    </p>
+                  </div>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); refreshMedia(); }}
+                    className="p-1.5 rounded-lg hover:bg-white/10 transition-colors text-slate-400 hover:text-slate-200"
+                    title="Refresh media records"
+                  >
+                    <RefreshCw size={13} />
+                  </button>
+                  <ChevronRight
+                    size={16}
+                    className={`text-slate-400 flex-shrink-0 transition-transform duration-200 ${mediaOpen ? "rotate-90" : ""}`}
+                  />
+                </div>
+
+                {/* Panel body */}
+                {mediaOpen && (
+                  <div className="p-4 space-y-3 bg-slate-50">
+                    {mediaRecordsLoading ? (
+                      <div className="flex items-center justify-center py-8 gap-2 text-slate-400 text-sm">
+                        <Loader2 size={18} className="animate-spin text-violet-400" />
+                        Loading media records…
+                      </div>
+                    ) : mediaRecords.length === 0 ? (
+                      <div className="text-center py-8 text-slate-400 text-sm flex flex-col items-center gap-2">
+                        <Mic size={28} className="text-slate-300" />
+                        No media records saved for this case yet
+                      </div>
+                    ) : (
+                      mediaRecords.map((rec, i) => (
+                        <MediaRecordCard key={rec.id} rec={rec} index={i} />
+                      ))
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
           )}
 
