@@ -3,17 +3,17 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import { BACKEND_URL } from "@/lib/config";
 import TopNav from "@/components/layout/TopNav";
+import CaseSearchSelect from "@/components/CaseSearchSelect";
 import {
   FileText, Upload, Sparkles, X, CheckCircle2, AlertCircle,
   Download, Loader2, FileScan, ClipboardList, Cpu, ChevronRight,
   FileWarning, RotateCcw, CloudUpload, ImageIcon, ScanText,
   Database, BrainCircuit, Users, Calendar, Search, Zap,
-  BookOpen, Tag, Shield, BarChart2,
+  BookOpen, Tag, Shield, BarChart2, ExternalLink, FileCheck, Clock,
 } from "lucide-react";
 
 type UIStage = "idle" | "uploading" | "uploaded" | "processing" | "done" | "error";
 type StageStatus = "pending" | "active" | "completed" | "failed";
-type CaseMode = "new" | "existing";
 
 interface StageProgress {
   current: number;
@@ -51,12 +51,20 @@ interface SubDoc {
 }
 
 interface CaseItem {
-  case_id: string;
-  document_count: number;
-  completed_count: number;
-  processing_count: number;
-  failed_count: number;
+  id: string;
+  caseNumber: string;
+  title: string;
+  type: string;
+  status: string;
+}
+
+interface CaseDoc {
+  document_id: number;
+  file_name: string;
+  original_name: string | null;
+  status: string;
   total_pages: number;
+  created_at: string | null;
 }
 
 const PIPELINE_STAGES: PipelineStage[] = [
@@ -133,7 +141,6 @@ function SubDocCard({ subdoc, index }: { subdoc: SubDoc; index: number }) {
 
   return (
     <div className="rounded-xl overflow-hidden border border-slate-200 bg-white">
-      {/* Header */}
       <div className="p-4 flex items-start gap-3 cursor-pointer" onClick={() => setExpanded(e => !e)}
         style={{ background: "linear-gradient(135deg, #F8FAFC, #F1F5F9)" }}>
         <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 text-white text-xs font-bold"
@@ -148,92 +155,33 @@ function SubDocCard({ subdoc, index }: { subdoc: SubDoc; index: number }) {
           <div className="flex items-center gap-3 text-xs text-slate-400">
             <span>Pages {subdoc.start_page}–{subdoc.end_page}</span>
             <span>·</span>
-            <span className="flex items-center gap-1">
-              <BarChart2 size={10} />
-              {pct}% confidence
-            </span>
+            <span className="flex items-center gap-1"><BarChart2 size={10} />{pct}% confidence</span>
           </div>
         </div>
-        <div className="flex-shrink-0 text-slate-400">
-          <ChevronRight size={14} className={`transition-transform duration-200 ${expanded ? "rotate-90" : ""}`} />
-        </div>
+        <ChevronRight size={14} className={`flex-shrink-0 text-slate-400 transition-transform duration-200 ${expanded ? "rotate-90" : ""}`} />
       </div>
 
-      {/* Summary always visible */}
       {c?.summary && (
         <div className="px-4 py-2 text-xs text-slate-600 leading-relaxed border-t border-slate-100 bg-slate-50/50">
           {c.summary}
         </div>
       )}
 
-      {/* Expanded detail */}
       {expanded && c && (
         <div className="px-4 pb-4 pt-2 space-y-3 border-t border-slate-100">
-          {c.subject && (
-            <div>
-              <div className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Subject</div>
-              <p className="text-xs text-slate-700">{c.subject}</p>
-            </div>
-          )}
-          {c.purpose && (
-            <div>
-              <div className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Purpose</div>
-              <p className="text-xs text-slate-700">{c.purpose}</p>
-            </div>
-          )}
+          {c.subject && <div><div className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Subject</div><p className="text-xs text-slate-700">{c.subject}</p></div>}
+          {c.purpose && <div><div className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Purpose</div><p className="text-xs text-slate-700">{c.purpose}</p></div>}
           {c.key_findings?.length > 0 && (
             <div>
-              <div className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5 flex items-center gap-1">
-                <Search size={10} /> Key Findings
-              </div>
-              <ul className="space-y-1">
-                {c.key_findings.map((f, i) => (
-                  <li key={i} className="flex items-start gap-1.5 text-xs text-slate-700">
-                    <span className="mt-0.5 w-1.5 h-1.5 rounded-full bg-blue-400 flex-shrink-0" />
-                    {f}
-                  </li>
-                ))}
-              </ul>
+              <div className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5 flex items-center gap-1"><Search size={10} /> Key Findings</div>
+              <ul className="space-y-1">{c.key_findings.map((f, i) => <li key={i} className="flex items-start gap-1.5 text-xs text-slate-700"><span className="mt-0.5 w-1.5 h-1.5 rounded-full bg-blue-400 flex-shrink-0" />{f}</li>)}</ul>
             </div>
           )}
-          {c.key_actions?.length > 0 && (
-            <div>
-              <div className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5 flex items-center gap-1">
-                <Zap size={10} /> Key Actions
-              </div>
-              <Pill items={c.key_actions} color="bg-amber-50 text-amber-700 border border-amber-100" />
-            </div>
-          )}
-          {c.key_persons?.length > 0 && (
-            <div>
-              <div className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5 flex items-center gap-1">
-                <Users size={10} /> People
-              </div>
-              <Pill items={c.key_persons} color="bg-purple-50 text-purple-700 border border-purple-100" />
-            </div>
-          )}
-          {c.organizations?.length > 0 && (
-            <div>
-              <div className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5 flex items-center gap-1">
-                <Shield size={10} /> Organizations
-              </div>
-              <Pill items={c.organizations} color="bg-indigo-50 text-indigo-700 border border-indigo-100" />
-            </div>
-          )}
-          {c.key_dates?.length > 0 && (
-            <div>
-              <div className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5 flex items-center gap-1">
-                <Calendar size={10} /> Important Dates
-              </div>
-              <Pill items={c.key_dates} color="bg-green-50 text-green-700 border border-green-100" />
-            </div>
-          )}
-          {c.main_content && (
-            <div>
-              <div className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Content Preview</div>
-              <p className="text-xs text-slate-600 leading-relaxed line-clamp-4">{c.main_content}</p>
-            </div>
-          )}
+          {c.key_actions?.length > 0 && <div><div className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5 flex items-center gap-1"><Zap size={10} /> Key Actions</div><Pill items={c.key_actions} color="bg-amber-50 text-amber-700 border border-amber-100" /></div>}
+          {c.key_persons?.length > 0 && <div><div className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5 flex items-center gap-1"><Users size={10} /> People</div><Pill items={c.key_persons} color="bg-purple-50 text-purple-700 border border-purple-100" /></div>}
+          {c.organizations?.length > 0 && <div><div className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5 flex items-center gap-1"><Shield size={10} /> Organizations</div><Pill items={c.organizations} color="bg-indigo-50 text-indigo-700 border border-indigo-100" /></div>}
+          {c.key_dates?.length > 0 && <div><div className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5 flex items-center gap-1"><Calendar size={10} /> Important Dates</div><Pill items={c.key_dates} color="bg-green-50 text-green-700 border border-green-100" /></div>}
+          {c.main_content && <div><div className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Content Preview</div><p className="text-xs text-slate-600 leading-relaxed line-clamp-4">{c.main_content}</p></div>}
         </div>
       )}
     </div>
@@ -241,10 +189,10 @@ function SubDocCard({ subdoc, index }: { subdoc: SubDoc; index: number }) {
 }
 
 export default function GenerateReportPage() {
-  const [caseMode, setCaseMode]               = useState<CaseMode>("new");
-  const [newCaseId, setNewCaseId]             = useState("");
-  const [selectedExistingCase, setSelectedExistingCase] = useState<string>("");
+  const [selectedCase, setSelectedCase]       = useState("");
   const [cases, setCases]                     = useState<CaseItem[]>([]);
+  const [existingDocs, setExistingDocs]       = useState<CaseDoc[]>([]);
+  const [docsLoading, setDocsLoading]         = useState(false);
   const [file, setFile]                       = useState<File | null>(null);
   const [dragging, setDragging]               = useState(false);
   const [uiStage, setUiStage]                 = useState<UIStage>("idle");
@@ -257,27 +205,30 @@ export default function GenerateReportPage() {
   const [errorMsg, setErrorMsg]               = useState("");
   const [logs, setLogs]                       = useState<string[]>([]);
   const [stageProgress, setStageProgress]     = useState<Record<string, StageProgress>>({});
-  const [completedStages, setCompletedStages] = useState<string[]>([]);
-  const [rerunConfirmStage, setRerunConfirmStage] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const xhrRef       = useRef<XMLHttpRequest | null>(null);
   const pollRef      = useRef<ReturnType<typeof setInterval> | null>(null);
   const logBoxRef    = useRef<HTMLDivElement>(null);
 
-  const caseId = caseMode === "new" ? newCaseId : selectedExistingCase;
-  const caseIdValid = /^[a-zA-Z0-9-]+$/.test(caseId) && caseId.trim().length > 0;
-  const canGenerate = caseIdValid && file !== null && uiStage === "idle" && caseMode === "new";
+  const canGenerate = !!selectedCase && file !== null && uiStage === "idle";
   const isBusy = uiStage === "uploading" || uiStage === "uploaded" || uiStage === "processing";
 
   useEffect(() => {
-    (async () => {
-      try {
-        const res = await fetch(`${BACKEND_URL}/pdf/cases`);
-        const data = await res.json();
-        setCases(data.cases || []);
-      } catch { }
-    })();
+    fetch("/api/cases")
+      .then(r => r.json())
+      .then(data => { if (Array.isArray(data)) setCases(data); })
+      .catch(() => {});
   }, []);
+
+  function fetchCaseDocs(caseId: string) {
+    setDocsLoading(true);
+    setExistingDocs([]);
+    fetch(`${BACKEND_URL}/pdf/case/${caseId}`)
+      .then(r => r.ok ? r.json() : null)
+      .then(data => { if (data?.documents) setExistingDocs(data.documents); })
+      .catch(() => {})
+      .finally(() => setDocsLoading(false));
+  }
 
   useEffect(() => () => { if (pollRef.current) clearInterval(pollRef.current); }, []);
 
@@ -300,7 +251,7 @@ export default function GenerateReportPage() {
   function uploadPDF(f: File): Promise<{ file_name: string; document_id: number }> {
     return new Promise((resolve, reject) => {
       const formData = new FormData();
-      formData.append("caseId", caseId.trim().toUpperCase());
+      formData.append("caseId", selectedCase);
       formData.append("file", f);
 
       const xhr = new XMLHttpRequest();
@@ -345,6 +296,7 @@ export default function GenerateReportPage() {
           const sdData = await sdRes.json();
           setSubdocs(sdData.subdocuments ?? []);
           setUiStage("done");
+          if (selectedCase) fetchCaseDocs(selectedCase);
         } else if (data.status === "failed") {
           stopPolling();
           setErrorMsg(data.error_message || "Pipeline failed");
@@ -378,37 +330,12 @@ export default function GenerateReportPage() {
     }
   }
 
-  async function handleRerunStage(stage: string) {
-    if (!documentId) return;
-
-    setErrorMsg(""); setSubdocs([]); setUploadPct(0); setCurrentStage(null); setLogs([]); setStageProgress({});
-    setRerunConfirmStage(null);
-    setUiStage("processing");
-
-    try {
-      const res = await fetch(`${BACKEND_URL}/pdf/rerun/${documentId}?start_stage=${stage}`, {
-        method: "POST",
-      });
-      if (res.ok) {
-        startPolling(documentId);
-      } else {
-        const errData = await res.json();
-        setErrorMsg(errData.detail || "Rerun failed");
-        setUiStage("error");
-      }
-    } catch (err: unknown) {
-      setErrorMsg(err instanceof Error ? err.message : "Unexpected error");
-      setUiStage("error");
-    }
-  }
-
   function reset() {
     xhrRef.current?.abort();
     stopPolling();
     setUiStage("idle"); setUploadPct(0); setUploadedFileName("");
     setDocumentId(null); setCurrentStage(null); setTotalPages(0);
     setSubdocs([]); setErrorMsg(""); setLogs([]); setStageProgress({}); setFile(null);
-    setCompletedStages([]);
     if (fileInputRef.current) fileInputRef.current.value = "";
   }
 
@@ -433,9 +360,9 @@ export default function GenerateReportPage() {
         `Type: ${sd.document_type} | Pages: ${sd.start_page}–${sd.end_page} | Confidence: ${Math.round((sd.confidence_score ?? 0) * 100)}%`,
         `${"=".repeat(70)}`,
       ];
-      if (c?.subject)   lines.push(`Subject: ${c.subject}`);
-      if (c?.purpose)   lines.push(`Purpose: ${c.purpose}`);
-      if (c?.summary)   lines.push(`\nSummary:\n${c.summary}`);
+      if (c?.subject)            lines.push(`Subject: ${c.subject}`);
+      if (c?.purpose)            lines.push(`Purpose: ${c.purpose}`);
+      if (c?.summary)            lines.push(`\nSummary:\n${c.summary}`);
       if (c?.key_findings?.length) lines.push(`\nKey Findings:\n${c.key_findings.map(f => `• ${f}`).join("\n")}`);
       if (c?.key_actions?.length)  lines.push(`\nKey Actions:\n${c.key_actions.map(a => `• ${a}`).join("\n")}`);
       if (c?.key_persons?.length)  lines.push(`\nPeople: ${c.key_persons.join(", ")}`);
@@ -448,12 +375,9 @@ export default function GenerateReportPage() {
     const blob = new Blob([text], { type: "text/plain" });
     const url  = URL.createObjectURL(blob);
     const a    = document.createElement("a");
-    a.href = url; a.download = `SubDocuments_${caseId.toUpperCase()}_${Date.now()}.txt`; a.click();
+    a.href = url; a.download = `SubDocuments_${selectedCase}_${Date.now()}.txt`; a.click();
     URL.revokeObjectURL(url);
   }
-
-  const isExistingCaseMode = caseMode === "existing" && selectedExistingCase;
-  const showRerunButtons = isExistingCaseMode && uiStage === "idle";
 
   return (
     <div className="flex flex-col min-h-screen">
@@ -487,86 +411,72 @@ export default function GenerateReportPage() {
                   <div className="w-7 h-7 rounded-lg bg-blue-100 flex items-center justify-center"><ClipboardList size={14} className="text-blue-600" /></div>
                   Case Selection
                 </h3>
-                <div className="space-y-3">
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => setCaseMode("new")}
-                      className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-all ${
-                        caseMode === "new"
-                          ? "bg-blue-100 text-blue-700 border border-blue-300"
-                          : "bg-slate-100 text-slate-600 border border-transparent hover:bg-slate-200"
-                      }`}
-                    >
-                      New Case
-                    </button>
-                    <button
-                      onClick={() => setCaseMode("existing")}
-                      className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-all ${
-                        caseMode === "existing"
-                          ? "bg-blue-100 text-blue-700 border border-blue-300"
-                          : "bg-slate-100 text-slate-600 border border-transparent hover:bg-slate-200"
-                      }`}
-                    >
-                      Existing Case
-                    </button>
-                  </div>
+                <label className="text-sm font-semibold text-slate-700 mb-1.5 block">Select Case</label>
+                <CaseSearchSelect
+                  cases={cases}
+                  value={selectedCase}
+                  onChange={(id) => {
+                    setSelectedCase(id);
+                    reset();
+                    setFile(null);
+                    if (id) fetchCaseDocs(id);
+                    else setExistingDocs([]);
+                  }}
+                  placeholder="— Choose a case —"
+                  disabled={isBusy}
+                />
+              </div>
 
-                  {caseMode === "new" ? (
-                    <div>
-                      <label className="form-label" htmlFor="newCaseId">Case ID <span className="text-red-500">*</span></label>
-                      <div className="relative">
-                        <input
-                          id="newCaseId"
-                          type="text"
-                          value={newCaseId}
-                          onChange={e => setNewCaseId(e.target.value.replace(/[^a-zA-Z0-9-]/g, ""))}
-                          placeholder="e.g. ACB-2024-00123"
-                          className="form-input pr-10"
-                          style={newCaseId && !/^[a-zA-Z0-9-]+$/.test(newCaseId) ? { borderColor: "#EF4444", boxShadow: "0 0 0 3px rgba(239,68,68,0.1)" } : {}}
-                          disabled={isBusy}
-                        />
-                        {newCaseId && (
-                          <div className="absolute right-3 top-1/2 -translate-y-1/2">
-                            {/^[a-zA-Z0-9-]+$/.test(newCaseId) ? <CheckCircle2 size={16} className="text-green-500" /> : <AlertCircle size={16} className="text-red-400" />}
-                          </div>
-                        )}
-                      </div>
-                      <p className="text-xs text-slate-400 mt-1">Alphanumeric and hyphens only</p>
+              {/* Existing documents */}
+              {selectedCase && (
+                <div className="content-card p-6">
+                  <h3 className="font-bold text-slate-800 mb-4 flex items-center gap-2">
+                    <div className="w-7 h-7 rounded-lg bg-emerald-100 flex items-center justify-center"><FileCheck size={14} className="text-emerald-600" /></div>
+                    Uploaded Documents
+                  </h3>
+                  {docsLoading ? (
+                    <div className="flex items-center gap-2 text-sm text-slate-400 py-2">
+                      <Loader2 size={14} className="animate-spin" /> Loading…
                     </div>
+                  ) : existingDocs.length === 0 ? (
+                    <p className="text-sm text-slate-400">No documents uploaded yet for this case.</p>
                   ) : (
-                    <div>
-                      <label className="form-label">Select Case</label>
-                      <select
-                        value={selectedExistingCase}
-                        onChange={e => {
-                          setSelectedExistingCase(e.target.value);
-                          if (e.target.value) {
-                            fetch(`${BACKEND_URL}/pdf/list`)
-                              .then(r => r.json())
-                              .then(data => {
-                                const doc = data.documents?.find((d: any) => d.case_id === e.target.value);
-                                if (doc) setDocumentId(doc.document_id);
-                              })
-                              .catch(err => console.error("Failed to fetch document_id:", err));
-                          }
-                        }}
-                        className="form-input"
-                        disabled={isBusy}
-                      >
-                        <option value="">-- Choose a case --</option>
-                        {cases.map(c => (
-                          <option key={c.case_id} value={c.case_id}>
-                            {c.case_id} ({c.document_count} docs, {c.total_pages} pages)
-                          </option>
-                        ))}
-                      </select>
+                    <div className="space-y-2">
+                      {existingDocs.map(doc => (
+                        <div key={doc.document_id} className="flex items-center gap-3 rounded-lg border border-slate-200 px-3 py-2.5 bg-slate-50">
+                          <FileText size={15} className={doc.status === "completed" ? "text-emerald-500" : doc.status === "failed" ? "text-red-400" : "text-amber-400"} />
+                          <div className="flex-1 min-w-0">
+                            <div className="text-xs font-semibold text-slate-700 truncate">{doc.original_name || doc.file_name}</div>
+                            <div className="flex items-center gap-2 mt-0.5">
+                              <span className={`text-xs font-medium ${doc.status === "completed" ? "text-emerald-600" : doc.status === "failed" ? "text-red-500" : "text-amber-500"}`}>
+                                {doc.status}
+                              </span>
+                              {doc.total_pages > 0 && <span className="text-xs text-slate-400">· {doc.total_pages}p</span>}
+                            </div>
+                          </div>
+                          {doc.status === "completed" && (
+                            <a
+                              href={`${BACKEND_URL}/pdf/file/${selectedCase}/${doc.file_name}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="w-7 h-7 rounded-lg bg-blue-50 flex items-center justify-center hover:bg-blue-100 transition-colors flex-shrink-0"
+                              title="View PDF"
+                            >
+                              <ExternalLink size={12} className="text-blue-500" />
+                            </a>
+                          )}
+                          {doc.status !== "completed" && (
+                            <Clock size={13} className="text-slate-300 flex-shrink-0" />
+                          )}
+                        </div>
+                      ))}
                     </div>
                   )}
                 </div>
-              </div>
+              )}
 
-              {/* Upload (only shown in new case mode) */}
-              {caseMode === "new" && (
+              {/* Upload — shown only after case selected */}
+              {selectedCase && (
                 <div className="content-card p-6">
                   <h3 className="font-bold text-slate-800 mb-4 flex items-center gap-2">
                     <div className="w-7 h-7 rounded-lg bg-cyan-100 flex items-center justify-center"><Upload size={14} className="text-cyan-600" /></div>
@@ -603,8 +513,8 @@ export default function GenerateReportPage() {
                 </div>
               )}
 
-              {/* Generate button (new case mode) */}
-              {caseMode === "new" && (
+              {/* Generate button */}
+              {selectedCase && (
                 <button onClick={handleGenerate} disabled={!canGenerate}
                   className="btn-ai w-full justify-center py-4 text-base" style={{ borderRadius: "14px" }}>
                   {uiStage === "uploading" ? (
@@ -615,55 +525,6 @@ export default function GenerateReportPage() {
                     <><Sparkles size={18} /> Extract Data<ChevronRight size={16} /></>
                   )}
                 </button>
-              )}
-
-              {/* Rerun buttons (existing case mode) */}
-              {showRerunButtons && (
-                <div className="content-card p-6">
-                  <h3 className="font-bold text-slate-800 mb-4 flex items-center gap-2">
-                    <div className="w-7 h-7 rounded-lg bg-purple-100 flex items-center justify-center"><RotateCcw size={14} className="text-purple-600" /></div>
-                    Rerun Pipeline Stage
-                  </h3>
-                  <div className="space-y-2">
-                    {PIPELINE_STAGES.slice(3).map((stage, i) => (
-                      <button
-                        key={stage.key}
-                        onClick={() => setRerunConfirmStage(stage.key)}
-                        className="w-full px-3 py-2 rounded-lg text-sm font-medium text-left bg-purple-50 text-purple-700 border border-purple-200 hover:bg-purple-100 transition-colors"
-                      >
-                        Rerun Stage {i + 4}: {stage.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Rerun confirmation modal */}
-              {rerunConfirmStage && (
-                <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-                  <div className="bg-white rounded-xl shadow-xl max-w-sm">
-                    <div className="p-6">
-                      <h3 className="text-lg font-bold text-slate-800 mb-2">Confirm Stage Rerun</h3>
-                      <p className="text-sm text-slate-600 mb-4">
-                        Rerunning from <strong>{PIPELINE_STAGES.find(s => s.key === rerunConfirmStage)?.label}</strong> will delete all downstream results and restart the pipeline.
-                      </p>
-                      <div className="flex gap-2">
-                        <button
-                          onClick={() => setRerunConfirmStage(null)}
-                          className="flex-1 px-3 py-2 rounded-lg text-sm font-medium bg-slate-100 text-slate-700 hover:bg-slate-200 transition-colors"
-                        >
-                          Cancel
-                        </button>
-                        <button
-                          onClick={() => handleRerunStage(rerunConfirmStage)}
-                          className="flex-1 px-3 py-2 rounded-lg text-sm font-medium bg-purple-600 text-white hover:bg-purple-700 transition-colors"
-                        >
-                          Confirm
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                </div>
               )}
 
               {(uiStage === "done" || uiStage === "error") && (
@@ -684,9 +545,7 @@ export default function GenerateReportPage() {
                   </div>
                   <h3 className="text-lg font-bold text-slate-400 mb-2">Pipeline Preview</h3>
                   <p className="text-sm text-slate-400 max-w-xs mb-8">
-                    {caseMode === "new"
-                      ? "Fill in Case ID, upload a merged PDF, and click Extract Data."
-                      : "Select an existing case to see rerun options."}
+                    {selectedCase ? "Upload a PDF and click Extract Data to begin." : "Select a case to get started."}
                   </p>
                   <div className="w-full space-y-2 text-left">
                     {PIPELINE_STAGES.map((s, i) => (
@@ -843,7 +702,6 @@ export default function GenerateReportPage() {
               {/* DONE */}
               {uiStage === "done" && (
                 <div className="content-card overflow-hidden animate-fade-in">
-                  {/* Header */}
                   <div className="p-5 flex items-center justify-between" style={{ background: "linear-gradient(135deg, #0F172A, #1E3A5F)", borderBottom: "1px solid rgba(6,182,212,0.2)" }}>
                     <div className="flex items-center gap-3">
                       <div className="w-9 h-9 rounded-xl bg-green-400/20 flex items-center justify-center">
@@ -852,7 +710,7 @@ export default function GenerateReportPage() {
                       <div>
                         <div className="text-white font-bold text-sm">Extraction Complete</div>
                         <div className="text-slate-400 text-xs">
-                          {subdocs.length} sub-document{subdocs.length !== 1 ? "s" : ""} · {totalPages} pages · Case {caseId.toUpperCase()}
+                          {subdocs.length} sub-document{subdocs.length !== 1 ? "s" : ""} · {totalPages} pages · Case {selectedCase}
                         </div>
                       </div>
                     </div>
@@ -861,7 +719,6 @@ export default function GenerateReportPage() {
                     </button>
                   </div>
 
-                  {/* Stage badges */}
                   <div className="px-5 py-3 flex flex-wrap gap-2 border-b border-slate-100">
                     {PIPELINE_STAGES.map(s => (
                       <span key={s.key} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-green-50 text-green-700 border border-green-100">
@@ -870,14 +727,12 @@ export default function GenerateReportPage() {
                     ))}
                   </div>
 
-                  {/* Sub-document cards */}
                   <div className="p-5 space-y-3 max-h-[600px] overflow-y-auto">
                     {subdocs.map((sd, i) => (
                       <SubDocCard key={sd.id} subdoc={sd} index={i} />
                     ))}
                   </div>
 
-                  {/* Log panel */}
                   <div className="px-5 pb-5">
                     <LogPanel logs={logs} logBoxRef={logBoxRef} />
                   </div>

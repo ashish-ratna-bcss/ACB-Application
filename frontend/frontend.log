@@ -6,7 +6,14 @@
   - Local:        http://localhost:3000
 
  ✓ Starting...
- ✓ Ready in 4.2s
- ✓ Compiled /middleware in 303ms (72 modules)
- ○ Compiling / ...
- ✓ Compiled / in 1469ms (473 modules)
+ ✓ Ready in 2.6s
+ ✓ Compiled /middleware in 253ms (72 modules)
+ ○ Compiling /generate-report ...
+ ✓ Compiled /generate-report in 1528ms (593 modules)
+ GET /generate-report 200 in 2320ms
+ ○ Compiling /speech ...
+ ✓ Compiled /speech in 1281ms (618 modules)
+ ○ Compiling /dashboard ...
+ ✓ Compiled /dashboard in 2s (1669 modules)
+ GET /dashboard 200 in 2712ms
+[?25h

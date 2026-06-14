@@ -5,6 +5,33 @@ from sqlalchemy import Column, DateTime, Float, ForeignKey, Integer, String, Tex
 from app.database import Base
 
 
+class Case(Base):
+    __tablename__ = "cases"
+
+    id                  = Column(String, primary_key=True)
+    case_number         = Column(String, unique=True, nullable=False)
+    title               = Column(String, nullable=False)
+    type                = Column(String, nullable=False)
+    fir_number          = Column(String)
+    status              = Column(String, default="active")
+    officer_id          = Column(String)
+    officer_name        = Column(String)
+    officer_department  = Column(String)
+    accused_name        = Column(String)
+    accused_designation = Column(String)
+    accused_department  = Column(String)
+    accused_contact     = Column(String)
+    complaint_summary   = Column(Text)
+    incident_date       = Column(String)
+    location            = Column(String)
+    amount_involved     = Column(Float, default=0)
+    documents_count     = Column(Integer, default=0)
+    drafts_count        = Column(Integer, default=0)
+    tags                = Column(Text)  # JSON array
+    created_at          = Column(DateTime, default=datetime.utcnow)
+    updated_at          = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
 class Document(Base):
     __tablename__ = "documents"
 
@@ -115,3 +142,26 @@ class ExtractedContent(Base):
     key_findings = Column(Text)   # JSON array
     key_actions = Column(Text)    # JSON array
     organizations = Column(Text)  # JSON array
+
+
+class MediaRecord(Base):
+    __tablename__ = "media_records"
+
+    id                   = Column(String, primary_key=True)   # uuid4
+    case_id              = Column(String, index=True, nullable=False)  # ref to cases.id (no FK constraint)
+    file_name            = Column(String)
+    audio_description    = Column(Text)
+    language             = Column(String)
+    language_name        = Column(String)
+    target_language      = Column(String)
+    target_language_name = Column(String)
+    task                 = Column(String)                     # "transcribe" | "translate"
+    text                 = Column(Text)
+    original_text        = Column(Text)
+    segments             = Column(Text)                       # json.dumps([{speaker, start, end, text}, ...])
+    original_segments    = Column(Text)                       # json.dumps([...]) or NULL
+    speaker_count        = Column(Integer, default=0)
+    diarization          = Column(Integer, default=0)         # 0/1
+    processing_time      = Column(Float)
+    created_at           = Column(DateTime, default=datetime.utcnow)
+    updated_at           = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

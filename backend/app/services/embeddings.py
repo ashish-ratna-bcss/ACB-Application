@@ -12,9 +12,8 @@ CHUNK_STEP    = CHUNK_SIZE - CHUNK_OVERLAP   # 1300
 
 
 def _chunks(text: str) -> list[str]:
-    """Split text into overlapping chunks. Returns at least one entry."""
-    if not text:
-        return [""]
+    if not text or not text.strip():
+        return []
     if len(text) <= CHUNK_SIZE:
         return [text]
     result = []
@@ -67,8 +66,16 @@ def store_subdoc_embeddings(
             for chunk_idx, chunk_text in enumerate(text_chunks):
                 embed_text = f"{header}\n{chunk_text}".strip()[:8000]
 
+                if not embed_text:
+                    logger.debug(f"Skipping empty chunk {chunk_idx} for sub-doc {sd_id}")
+                    continue
+
                 resp   = ollama_client.embeddings(model=embed_model, prompt=embed_text)
                 vector = resp.embedding
+
+                if not vector:
+                    logger.warning(f"Ollama returned empty vector for chunk {chunk_idx} sub-doc {sd_id} — skipping")
+                    continue
 
                 points.append(PointStruct(
                     id=str(uuid.uuid4()),
