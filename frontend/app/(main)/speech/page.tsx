@@ -173,6 +173,7 @@ async function readApiError(response: Response) {
 }
 
 export default function SpeechPage() {
+  const [userRole, setUserRole] = useState<string | null>(null);
   const [cases, setCases] = useState<{ id: string; caseNumber: string; title: string }[]>([]);
   const [selectedCaseId, setSelectedCaseId] = useState('');
   const [audioDescription, setAudioDescription] = useState('');
@@ -218,6 +219,9 @@ export default function SpeechPage() {
     streamRef.current = null;
   }, []);
 
+  // officer → local self-hosted model; admin → sarvam cloud API
+  const provider = userRole === 'admin' ? 'sarvam' : 'local';
+
   const callSpeechApi = useCallback(
     async (endpoint: 'transcribe' | 'transcribe-live', blob: Blob, filename: string) => {
       const formData = new FormData();
@@ -227,6 +231,7 @@ export default function SpeechPage() {
         language: sourceLanguage,
         task,
         target_language: targetLanguage,
+        provider,
       });
 
       if (endpoint === 'transcribe') {
@@ -241,7 +246,7 @@ export default function SpeechPage() {
       if (!response.ok) throw new Error(await readApiError(response));
       return response.json() as Promise<SpeechResult>;
     },
-    [diarize, sourceLanguage, speakerCount, targetLanguage, task],
+    [diarize, provider, sourceLanguage, speakerCount, targetLanguage, task],
   );
 
   const runLivePreview = useCallback(async () => {
@@ -265,6 +270,13 @@ export default function SpeechPage() {
   }, [recordingUrl]);
 
   useEffect(() => {
+    fetch("/api/me")
+      .then((r) => r.json())
+      .then((data) => { if (data?.role) setUserRole(data.role); })
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => {
     fetch("/api/cases")
       .then((r) => r.json())
       .then((data) => { if (Array.isArray(data)) setCases(data); })
@@ -275,7 +287,7 @@ export default function SpeechPage() {
     let cancelled = false;
     async function checkBackend() {
       try {
-        const response = await fetch(`${API_BASE}/health`, { cache: 'no-store' });
+        const response = await fetch(`${API_BASE}/health?provider=${provider}`, { cache: 'no-store' });
         const data = await response.json();
         if (cancelled) return;
         if (response.ok) {
@@ -297,7 +309,7 @@ export default function SpeechPage() {
       stopStream();
       if (recordingUrlRef.current) URL.revokeObjectURL(recordingUrlRef.current);
     };
-  }, [stopStream, stopTimers]);
+  }, [provider, stopStream, stopTimers]);
 
   async function startRecording() {
     try {
@@ -669,6 +681,13 @@ export default function SpeechPage() {
                   </div>
                   <p className="text-slate-900 whitespace-pre-wrap leading-7">{result.text}</p>
                 </div>
+
+                {result.original_text && result.task === 'transcribe' && (
+                  <div className="rounded-lg border border-blue-100 bg-blue-50 p-4">
+                    <div className="text-sm font-bold text-blue-700 mb-2">English Translation (auto)</div>
+                    <p className="text-slate-700 whitespace-pre-wrap leading-7">{result.original_text}</p>
+                  </div>
+                )}
 
                 {editedSegments.length > 0 && result.diarization && !result.diarization_warning && (() => {
                   const allSpeakers = speakerNames;

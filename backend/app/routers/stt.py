@@ -12,27 +12,43 @@ router = APIRouter(prefix="/stt", tags=["Speech Translation"])
 UPLOAD_DIR = Path(os.getenv("AUDIO_STORAGE_PATH", Path(__file__).resolve().parents[2] / "storage" / "stt_uploads"))
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
-_transcriber = None
+_sarvam_transcriber = None
+_local_transcriber = None
 _processor = None
 _init_error: Optional[str] = None
 
 
-def _get_engine():
-    global _transcriber, _processor, _init_error
-    if _transcriber and _processor:
-        return _transcriber, _processor
+def _get_engine(provider: str = "sarvam"):
+    global _sarvam_transcriber, _local_transcriber, _processor, _init_error
 
     try:
         from app.services.speech.audio_processor import AudioProcessor
-        from app.services.speech.transcriber import VoskTranscriber
-
-        _transcriber = VoskTranscriber()
-        _processor = AudioProcessor()
-        _init_error = None
-        return _transcriber, _processor
+        if _processor is None:
+            _processor = AudioProcessor()
     except Exception as exc:
         _init_error = str(exc)
-        raise HTTPException(status_code=503, detail=f"Speech engine is not configured: {_init_error}") from exc
+        raise HTTPException(status_code=503, detail=f"Audio processor unavailable: {_init_error}") from exc
+
+    if provider == "local":
+        if _local_transcriber is None:
+            try:
+                from app.services.speech.local_transcriber import LocalTranscriber
+                _local_transcriber = LocalTranscriber()
+            except Exception as exc:
+                _init_error = str(exc)
+                raise HTTPException(status_code=503, detail=f"Local STT engine unavailable: {_init_error}") from exc
+        return _local_transcriber, _processor
+
+    # default: sarvam
+    if _sarvam_transcriber is None:
+        try:
+            from app.services.speech.transcriber import VoskTranscriber
+            _sarvam_transcriber = VoskTranscriber()
+            _init_error = None
+        except Exception as exc:
+            _init_error = str(exc)
+            raise HTTPException(status_code=503, detail=f"Sarvam STT engine unavailable: {_init_error}") from exc
+    return _sarvam_transcriber, _processor
 
 
 def _safe_filename(filename: str, fallback: str) -> str:
@@ -61,14 +77,21 @@ def _result_payload(result: dict, **extra):
     }
 
 
-def _apply_diarization(processed_path: str, result: dict, language: str, task: str, target_language: str, num_speakers: int):
+def _apply_diarization(processed_path: str, result: dict, language: str, task: str, target_language: str, num_speakers: int, transcriber=None):
     from app.services.speech.diarizer import Diarizer
     from app.services.speech.sarvam_transcriber import SARVAM_LANGUAGE_MAP
+
+    # Diarization requires Sarvam chunk-level transcription
+    sarvam_obj = getattr(transcriber, "sarvam", None) if transcriber else None
+    if sarvam_obj is None and _sarvam_transcriber is not None:
+        sarvam_obj = getattr(_sarvam_transcriber, "sarvam", None)
+    if sarvam_obj is None:
+        raise RuntimeError("Diarization requires Sarvam provider. Switch to admin account or disable diarization.")
 
     dia = Diarizer.get_instance()
     dia_segments, speaker_count = dia.diarize(processed_path, num_speakers=num_speakers if num_speakers > 0 else None)
 
-    sarvam = _transcriber.sarvam
+    sarvam = sarvam_obj
     is_auto = language == "auto"
     sarvam_lang = result.get("detected_language") if is_auto and result.get("detected_language") else SARVAM_LANGUAGE_MAP.get(language, "unknown")
     detected_lang = result.get("detected_language") if is_auto else None
@@ -171,13 +194,14 @@ def _apply_diarization(processed_path: str, result: dict, language: str, task: s
 
 
 @router.get("/health")
-async def speech_health():
+async def speech_health(provider: str = Query(default="sarvam")):
     try:
-        transcriber, _ = _get_engine()
+        transcriber, _ = _get_engine(provider)
         return {
             "status": "healthy",
             "service": "ACB Speech Translation",
-            "model": "Sarvam AI",
+            "model": "Local STT" if provider == "local" else "Sarvam AI",
+            "provider": provider,
             "model_loaded": transcriber.is_model_loaded(),
             "available_languages": transcriber.get_available_languages(),
         }
@@ -189,8 +213,8 @@ async def speech_health():
 
 
 @router.get("/languages")
-async def speech_languages():
-    transcriber, _ = _get_engine()
+async def speech_languages(provider: str = Query(default="sarvam")):
+    transcriber, _ = _get_engine(provider)
     return {"languages": transcriber.get_available_languages()}
 
 
@@ -202,13 +226,14 @@ async def transcribe_media(
     target_language: str = Query(default="en"),
     diarize: bool = Query(default=False),
     num_speakers: int = Query(default=0),
+    provider: str = Query(default="sarvam"),
 ):
     if task not in {"transcribe", "translate"}:
         raise HTTPException(status_code=400, detail="task must be 'transcribe' or 'translate'")
     if not file.filename:
         raise HTTPException(status_code=400, detail="No file provided")
 
-    transcriber, processor = _get_engine()
+    transcriber, processor = _get_engine(provider)
     start_time = time.time()
     permanent_path = UPLOAD_DIR / _safe_filename(file.filename, "recording.wav")
     processed_path: Optional[str] = None
@@ -219,30 +244,39 @@ async def transcribe_media(
             raise HTTPException(status_code=400, detail="Empty media file")
         permanent_path.write_bytes(content)
 
-        processed_path = processor.process_audio(str(permanent_path))
+        # Local provider: send original file directly — AudioProcessor's spectral gating
+        # degrades diarization quality on the remote endpoint.
+        if provider == "local":
+            audio_for_transcription = str(permanent_path)
+        else:
+            processed_path = processor.process_audio(str(permanent_path))
+            audio_for_transcription = processed_path
+
         initial_task = "transcribe" if diarize and task == "translate" else task
         result = transcriber.transcribe(
-            processed_path,
+            audio_for_transcription,
             language=language,
             task=initial_task,
             target_language=target_language,
         )
 
-        speaker_count = 0
-        if diarize:
+        # Local provider returns diarization natively — skip the Sarvam-based pipeline
+        speaker_count = result.get("speaker_count", 0)
+        if diarize and provider != "local":
             try:
                 result, speaker_count = _apply_diarization(
-                    processed_path,
+                    audio_for_transcription,
                     result,
                     language,
                     task,
                     target_language,
                     num_speakers,
+                    transcriber=transcriber,
                 )
             except Exception as exc:
                 if task == "translate":
                     result = transcriber.transcribe(
-                        processed_path,
+                        audio_for_transcription,
                         language=language,
                         task="translate",
                         target_language=target_language,
@@ -276,8 +310,9 @@ async def transcribe_live(
     language: str = Query(default="auto"),
     task: str = Query(default="transcribe"),
     target_language: str = Query(default="en"),
+    provider: str = Query(default="sarvam"),
 ):
-    transcriber, processor = _get_engine()
+    transcriber, processor = _get_engine(provider)
     tmp_path = UPLOAD_DIR / _safe_filename(file.filename or "live.webm", "live.webm")
     processed_path: Optional[str] = None
     start_time = time.time()

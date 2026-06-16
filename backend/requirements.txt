@@ -1,10 +1,15 @@
-fastapi==0.115.5
-uvicorn[standard]==0.32.1
-python-multipart==0.0.17
-aiofiles==24.1.0
+# Web framework
+fastapi==0.137.1
+uvicorn[standard]==0.49.0
+python-multipart==0.0.32
+aiofiles==25.1.0
+python-dotenv==1.2.2
 
 # Database
-sqlalchemy==2.0.36
+sqlalchemy==2.0.51
+
+# Validation
+pydantic==2.13.4
 
 # PDF processing
 pdf2image==1.17.0
@@ -14,22 +19,20 @@ Pillow==11.0.0
 paddlepaddle==2.6.2
 paddleocr==2.8.1
 
-# AI section detection + embeddings (Ollama)
-ollama==0.4.4
+# HTTP client
+requests
+
+# AI / Ollama (Python client — connects to remote Ollama server)
+ollama==0.6.2
 
 # Vector store
-qdrant-client==1.12.1
+qdrant-client==1.18.0
+numpy<2.0
 
-# Speech transcription, translation, and diarization
+# Speech transcription, diarization, translation
 scipy
-numpy
-requests
-python-dotenv
 torch
 torchaudio
 pyannote.audio
 transformers
-IndicTransToolkit
-sacremoses
-sarvamai
 imageio-ffmpeg
