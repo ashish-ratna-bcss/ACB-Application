@@ -14,7 +14,7 @@ _BACKEND_ENV = Path(__file__).resolve().parents[3] / ".env"
 load_dotenv(_BACKEND_ENV)
 
 os.environ.setdefault("MPLCONFIGDIR", "/tmp/acb_matplotlib")
-os.environ["HF_HUB_OFFLINE"] = "1"
+# HF_HUB_OFFLINE removed — model is now cached locally; allow cache-hit validation
 
 _DIARIZE_AVAILABLE = False
 _DIARIZE_ERROR = None

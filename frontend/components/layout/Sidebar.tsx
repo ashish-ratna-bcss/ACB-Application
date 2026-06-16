@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { useEffect, useState } from 'react';
 import {
   Shield, LayoutDashboard, FolderOpen,
   Settings, LogOut, Cpu, ChevronRight,
@@ -24,8 +25,26 @@ const NAV_ITEMS: NavItem[] = [
   { href: '/settings', label: 'Settings', icon: <Settings size={18} /> },
 ];
 
+type UserInfo = { name: string; designation: string; initials: string };
+
 export default function Sidebar() {
   const pathname = usePathname();
+  const [user, setUser] = useState<UserInfo>({ name: '...', designation: '...', initials: '?' });
+
+  useEffect(() => {
+    fetch('/api/me')
+      .then(r => r.json())
+      .then(data => {
+        if (data?.name) {
+          const parts = (data.name as string).split(' ');
+          const initials = parts.length >= 2
+            ? (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
+            : data.name.slice(0, 2).toUpperCase();
+          setUser({ name: data.name, designation: data.designation || data.role, initials });
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   function isActive(href: string): boolean {
     if (href === '/dashboard') return pathname === '/dashboard';
@@ -106,11 +125,11 @@ export default function Sidebar() {
             className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 text-white text-xs font-bold"
             style={{ background: 'linear-gradient(135deg, #2563EB, #06B6D4)' }}
           >
-            RK
+            {user.initials}
           </div>
           <div className="min-w-0 flex-1">
-            <div className="text-slate-800 text-sm font-semibold truncate">Insp. Rajesh Kumar</div>
-            <div className="text-slate-400 text-xs truncate">Investigation Officer</div>
+            <div className="text-slate-800 text-sm font-semibold truncate">{user.name}</div>
+            <div className="text-slate-400 text-xs truncate">{user.designation}</div>
           </div>
         </div>
         <button
