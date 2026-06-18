@@ -92,16 +92,6 @@ class LocalTranscriber:
         raw_dialogue = data.get("raw", {}).get("dialogue", [])
         english_dialogue = data.get("english", {}).get("dialogue", [])
 
-        # Local endpoint always provides both raw + English.
-        # transcribe → raw as primary, english as original (bonus translation shown alongside)
-        # translate  → english as primary, raw as original
-        if task == "translate" and english_dialogue:
-            primary_dialogue = english_dialogue
-            original_dialogue = raw_dialogue
-        else:
-            primary_dialogue = raw_dialogue
-            original_dialogue = english_dialogue  # show free English translation alongside
-
         def _dialogue_to_segments(dialogue: list, id_offset: int = 0) -> list:
             return [
                 {
@@ -115,8 +105,42 @@ class LocalTranscriber:
                 if turn.get("text", "").strip()
             ]
 
-        segments = _dialogue_to_segments(primary_dialogue)
-        original_segments = _dialogue_to_segments(original_dialogue)
+        raw_segments = _dialogue_to_segments(raw_dialogue)
+        english_segments = _dialogue_to_segments(english_dialogue)
+
+        # Ollama cleanup layer — clean ONLY the raw (detected-language) turns, using the
+        # English dialogue as meaning context. Falls back to uncorrected raw on any failure.
+        try:
+            from app.services.speech.transcript_corrector import correct_raw_segments
+            raw_segments = correct_raw_segments(raw_segments, english_segments, detected_lang)
+        except Exception as exc:
+            print(f"[LocalTranscriber] Correction skipped: {exc}")
+
+        # The raw and English dialogues use different diarization granularity
+        # (e.g. 7 raw turns vs 16 English turns), so they cannot be merged 1:1.
+        # Attach the time-overlapping counterpart text to each primary turn as
+        # `original_text` so the UI can show both versions per diarization turn.
+        def _attach_overlap(primary: list, secondary: list) -> None:
+            for seg in primary:
+                ps, pe = seg.get("start", 0.0), seg.get("end", 0.0)
+                overlaps = [
+                    o["text"] for o in secondary
+                    if o.get("text") and o.get("start", 0.0) < pe and o.get("end", 0.0) > ps
+                ]
+                if overlaps:
+                    seg["original_text"] = " ".join(overlaps)
+
+        # Local endpoint always provides both raw + English.
+        # transcribe → raw as primary, english as original (bonus translation shown alongside)
+        # translate  → english as primary, raw as original
+        if task == "translate" and english_dialogue:
+            segments = english_segments
+            original_segments = raw_segments
+        else:
+            segments = raw_segments
+            original_segments = english_segments  # show free English translation alongside
+
+        _attach_overlap(segments, original_segments)
 
         full_text = " ".join(s["text"] for s in segments) or "(No speech detected)"
         original_text = " ".join(s["text"] for s in original_segments) if original_segments else ""

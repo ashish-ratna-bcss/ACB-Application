@@ -22,8 +22,9 @@ fail() { echo -e "${RED}[FAIL]${NC}  $1"; }
 kill_existing() {
     pkill -f "$BACKEND/qdrant" 2>/dev/null && warn "Killed existing Qdrant" || true
     pkill -f "uvicorn.*app.main" 2>/dev/null && warn "Killed existing backend" || true
-    pkill -f "python main.py" 2>/dev/null && true
+    pkill -f "python main.py" 2>/dev/null || true
     # Leave Next.js alone if already running
+    return 0
 }
 
 wait_for_port() {

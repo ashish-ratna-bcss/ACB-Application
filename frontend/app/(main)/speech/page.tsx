@@ -189,6 +189,7 @@ export default function SpeechPage() {
   const [recordingUrl, setRecordingUrl] = useState('');
   const [result, setResult] = useState<SpeechResult | null>(null);
   const [editedSegments, setEditedSegments] = useState<Segment[]>([]);
+  const [diaLang, setDiaLang] = useState<'raw' | 'english'>('raw');
   const [speakerNames, setSpeakerNames] = useState<string[]>([]);
   const [editingSpeaker, setEditingSpeaker] = useState<string | null>(null);
   const [liveResult, setLiveResult] = useState<SpeechResult | null>(null);
@@ -783,6 +784,23 @@ export default function SpeechPage() {
                         </div>
                       </div>
 
+                      {/* Language tabs — investigation officer (local) only: one language at a time */}
+                      {provider === 'local' && (
+                        <div className="flex gap-1 mb-3 p-1 bg-slate-100 rounded-lg w-fit">
+                          {([['raw', result?.language_name || 'Original'], ['english', 'English']] as const).map(([key, label]) => (
+                            <button
+                              key={key}
+                              onClick={() => setDiaLang(key)}
+                              className={`px-4 py-1.5 rounded-md text-xs font-semibold transition-colors ${
+                                diaLang === key ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+                              }`}
+                            >
+                              {label}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+
                       <div className="space-y-3">
                         {editedSegments.map((segment, index) => {
                           const colors = SPEAKER_COLORS[segment.speaker || ''] || PALETTE[0];
@@ -809,10 +827,21 @@ export default function SpeechPage() {
                                 ))}
                                 <span className="text-xs text-slate-400 ml-1">{formatTime(segment.start)} – {formatTime(segment.end)}</span>
                               </div>
-                              {segment.original_text && (
-                                <p className="text-sm text-slate-500 mb-1.5 whitespace-pre-wrap">{segment.original_text}</p>
+                              {provider === 'local' ? (
+                                // One language at a time, chosen by the tab. raw = detected language, english = overlap translation.
+                                <p className="text-slate-900 whitespace-pre-wrap leading-relaxed">
+                                  {diaLang === 'english'
+                                    ? (segment.original_text || '— no English for this turn —')
+                                    : segment.text}
+                                </p>
+                              ) : (
+                                <>
+                                  {segment.original_text && (
+                                    <p className="text-sm text-slate-500 mb-1.5 whitespace-pre-wrap">{segment.original_text}</p>
+                                  )}
+                                  <p className="text-slate-900 whitespace-pre-wrap leading-relaxed">{segment.text}</p>
+                                </>
                               )}
-                              <p className="text-slate-900 whitespace-pre-wrap leading-relaxed">{segment.text}</p>
                             </div>
                           );
                         })}
