@@ -1,0 +1,107 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600;8..60,700&family=Noto+Sans+Telugu:wght@400;500;600&display=swap');
+
+* {
+  box-sizing: border-box;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: 'Inter', 'Noto Sans', 'Segoe UI', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  background: var(--bg);
+  color: var(--text);
+}
+
+button {
+  font-family: inherit;
+  cursor: pointer;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(120, 135, 160, 0.38);
+  border-radius: 8px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(120, 135, 160, 0.6);
+  background-clip: padding-box;
+}
+
+@keyframes acbFade {
+  from {
+    opacity: 0;
+    transform: translateY(7px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes acbBar {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+
+@keyframes acbPulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.45;
+  }
+}
+
+:root {
+  --bg: #EEF1F4;
+  --surface: #FFFFFF;
+  --surface-2: #F7F9FB;
+  --surface-3: #EEF2F6;
+  --border: #E1E6EC;
+  --border-2: #EDF1F5;
+  --text: #0F172A;
+  --text-2: #374151;
+  --text-3: #6B7280;
+  --shadow: 0 1px 2px rgba(16, 24, 40, 0.06);
+}
+
+[data-theme='dark'] {
+  --bg: #0B1019;
+  --surface: #141B27;
+  --surface-2: #0F1622;
+  --surface-3: #1C2533;
+  --border: #283443;
+  --border-2: #1E2836;
+  --text: #F1F5F9;
+  --text-2: #C5D0DE;
+  --text-3: #8597AD;
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+}
+
+code {
+  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
+    monospace;
+}

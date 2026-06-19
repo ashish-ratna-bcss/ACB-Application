@@ -1,0 +1,16 @@
+export { default as AdministrationPage } from './AdministrationPage';
+export { default as ApprovalPage } from './ApprovalPage';
+export { default as CaseReportsPage } from './CaseReportsPage';
+export { default as ComplaintsPage } from './ComplaintsPage';
+export { default as CourtPage } from './CourtPage';
+export { default as DashboardPage } from './DashboardPage';
+export { default as DocumentProcessorPage } from './DocumentProcessorPage';
+export { default as EvidencePage } from './EvidencePage';
+export { default as InvestigationPage } from './InvestigationPage';
+export { default as ProsecutionPage } from './ProsecutionPage';
+export { default as RemandPage } from './RemandPage';
+export { default as ReportsPage } from './ReportsPage';
+export { default as SettingsPage } from './SettingsPage';
+export { default as SpeechIntelligencePage } from './SpeechIntelligencePage';
+export { default as TrapPage } from './TrapPage';
+export { default as VerificationPage } from './VerificationPage';

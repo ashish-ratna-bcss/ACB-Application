@@ -1,0 +1,170 @@
+import os
+import ssl
+import urllib.request
+import warnings
+
+# Required for PaddleOCR compatibility when protobuf >= 4.x is installed
+# (pyannote.audio pulls in opentelemetry which needs protobuf 6.x;
+#  PaddlePaddle's generated _pb2 files only work with pure-Python impl)
+os.environ.setdefault("PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION", "python")
+
+# ── SSL bypass for PaddleOCR model downloads from Baidu CDN ──────────────────
+# PaddleOCR uses `requests` (urllib3) internally — the standard ssl patch alone
+# does not help. Must patch all three layers.
+
+# 1. urllib ssl context
+ssl._create_default_https_context = ssl._create_unverified_context
+os.environ["PYTHONHTTPSVERIFY"] = "0"
+
+# 2. urllib opener (urlretrieve path)
+_ctx = ssl.create_default_context()
+_ctx.check_hostname = False
+_ctx.verify_mode = ssl.CERT_NONE
+urllib.request.install_opener(
+    urllib.request.build_opener(urllib.request.HTTPSHandler(context=_ctx))
+)
+
+# 3. requests / urllib3 (PaddleOCR download_with_progressbar uses requests.get)
+try:
+    import requests
+    import urllib3
+    warnings.filterwarnings("ignore", category=urllib3.exceptions.InsecureRequestWarning)
+    urllib3.disable_warnings()
+    _orig_request = requests.Session.request
+
+    def _request_no_verify(self, method, url, **kwargs):
+        kwargs.setdefault("verify", False)
+        return _orig_request(self, method, url, **kwargs)
+
+    requests.Session.request = _request_no_verify
+except ImportError:
+    pass
+
+import json
+from contextlib import asynccontextmanager
+from datetime import datetime
+from pathlib import Path
+
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+
+from app.database import SessionLocal, init_db
+from app.log_handler import register_handler
+from app.routers import pdf, stt
+from app.routers import cases as cases_router
+from app.routers import media_records as media_records_router
+
+
+def _seed_cases() -> None:
+    """Seed cases.json on first run, then backfill any document case_ids missing from cases table."""
+    from app.models import Case, Document
+    db = SessionLocal()
+    try:
+        if db.query(Case).count() == 0:
+            json_path = Path(__file__).parents[2] / "frontend" / "data" / "cases.json"
+            if json_path.exists():
+                data = json.loads(json_path.read_text(encoding="utf-8"))
+                for c in data:
+                    db.add(Case(
+                        id=c["id"],
+                        case_number=c.get("caseNumber", c["id"]),
+                        title=c["title"],
+                        type=c["type"],
+                        fir_number=c.get("firNumber"),
+                        status=c.get("status", "active"),
+                        officer_id=c.get("officerId"),
+                        officer_name=c.get("officerName"),
+                        officer_department=c.get("officerDepartment"),
+                        accused_name=c.get("accusedName"),
+                        accused_designation=c.get("accusedDesignation"),
+                        accused_department=c.get("accusedDepartment"),
+                        accused_contact=c.get("accusedContact"),
+                        complaint_summary=c.get("complaintSummary"),
+                        incident_date=c.get("incidentDate"),
+                        location=c.get("location"),
+                        amount_involved=c.get("amountInvolved", 0),
+                        documents_count=c.get("documentsCount", 0),
+                        drafts_count=c.get("draftsCount", 0),
+                        tags=json.dumps(c.get("tags", [])),
+                    ))
+                db.commit()
+                print(f"[startup] Seeded {len(data)} cases from cases.json")
+
+        # Backfill stub cases for any document case_id with no parent in cases table
+        doc_ids = {r[0] for r in db.query(Document.case_id).distinct().all()}
+        existing = {r[0] for r in db.query(Case.id).all()}
+        missing = doc_ids - existing
+        if missing:
+            count = db.query(Case).count()
+            year = datetime.utcnow().year
+            for cid in sorted(missing):
+                count += 1
+                docs = db.query(Document).filter(Document.case_id == cid).order_by(Document.created_at).all()
+                first_created = docs[0].created_at if docs else datetime.utcnow()
+                db.add(Case(
+                    id=cid,
+                    case_number=f"ACB/{year}/{str(count).zfill(3)}",
+                    title=f"Case {cid}",
+                    type="other",
+                    status="active",
+                    documents_count=len(docs),
+                    tags=json.dumps([]),
+                    created_at=first_created,
+                    updated_at=first_created,
+                ))
+            db.commit()
+            print(f"[startup] Backfilled {len(missing)} stub cases from documents table")
+    finally:
+        db.close()
+
+
+@asynccontextmanager
+async def lifespan(_: FastAPI):
+    register_handler()
+    init_db()
+    _seed_cases()
+    yield
+
+
+app = FastAPI(
+    title="ACB Investigation API",
+    description="Anti-Corruption Bureau — Backend API for document processing and case management.",
+    version="1.0.0",
+    docs_url="/docs",
+    redoc_url="/redoc",
+    lifespan=lifespan,
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=False,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+app.include_router(cases_router.router)
+app.include_router(media_records_router.router)
+app.include_router(pdf.router)
+app.include_router(stt.router)
+
+
+@app.get("/", tags=["Health"])
+async def root():
+    return {"status": "ok", "service": "ACB Investigation API", "version": "1.0.0"}
+
+
+@app.get("/health", tags=["Health"])
+async def health():
+    return {"status": "healthy"}
+
+
+@app.get("/pdf/draft-progress/{case_id}", tags=["Draft"])
+async def draft_progress_direct(case_id: str):
+    from app.services.ai_draft_generator import get_draft_progress
+    return get_draft_progress(case_id)
+
+
+@app.get("/test-ping/{val}", tags=["Debug"])
+async def test_ping(val: str):
+    return {"pong": val}

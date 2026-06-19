@@ -1,0 +1,111 @@
+INFO:     Will watch for changes in these directories: ['C:\\Users\\Trooper\\Desktop\\Rajesh\\ACB\\backend']
+INFO:     Uvicorn running on http://127.0.0.1:8000 (Press CTRL+C to quit)
+INFO:     Started reloader process [23748] using WatchFiles
+INFO:     Started server process [29824]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     127.0.0.1:58134 - "GET /pdf/cases HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58134 - "GET /pdf/cases HTTP/1.1" 200 OK
+Sarvam AI initialized — Regional language engine ready
+[Transcriber] Sarvam AI engine ready for: ['en', 'hi', 'te', 'ta', 'bn', 'kn', 'ml', 'mr', 'gu', 'pa', 'or', 'as']
+INFO:     127.0.0.1:58134 - "GET /stt/health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55176 - "GET /stt/health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54097 - "GET /pdf/cases HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54097 - "GET /pdf/cases HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53954 - "GET /pdf/stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53954 - "GET /pdf/stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55767 - "GET /stt/health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63483 - "GET /stt/health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50570 - "GET /stt/health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50570 - "GET /stt/health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52945 - "GET /stt/health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61587 - "GET /stt/health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51189 - "GET /stt/health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56087 - "GET /stt/health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55435 - "GET /stt/health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65292 - "GET /stt/health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60173 - "GET /stt/health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59556 - "GET /stt/health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63126 - "GET /pdf/cases HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63126 - "GET /pdf/cases HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63126 - "GET /pdf/cases HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63126 - "GET /pdf/cases HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57289 - "GET /pdf/cases HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52494 - "GET /pdf/cases HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52494 - "GET /pdf/saved-draft/500DOC HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52494 - "GET /pdf/case/500DOC HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52494 - "GET /pdf/cases HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51140 - "GET /pdf/cases HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56885 - "GET /pdf/list HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61888 - "GET /pdf/cases HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61888 - "GET /pdf/cases HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53823 - "GET /stt/health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63349 - "GET /stt/health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49236 - "GET /pdf/cases HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63349 - "GET /pdf/cases HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61337 - "GET /pdf/cases HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61337 - "GET /pdf/cases HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63203 - "GET /pdf/cases HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49162 - "GET /stt/health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63203 - "GET /stt/health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49162 - "GET /pdf/cases HTTP/1.1" 200 OK
+C:\Users\Trooper\AppData\Local\Programs\Python\Python311\Lib\site-packages\pyannote\audio\core\io.py:47: UserWarning: 
+torchcodec is not installed correctly so built-in audio decoding will fail. Solutions are:
+* use audio preloaded in-memory as a {'waveform': (channel, time) torch.Tensor, 'sample_rate': int} dictionary;
+* fix torchcodec installation. Error message was:
+
+cannot import name 'register_fake' from 'torch.library' (C:\Users\Trooper\AppData\Local\Programs\Python\Python311\Lib\site-packages\torch\library.py)
+  warnings.warn(
+C:\Users\Trooper\AppData\Local\Programs\Python\Python311\Lib\site-packages\pyannote\audio\models\blocks\pooling.py:103: UserWarning: std(): degrees of freedom is <= 0. Correction should be strictly less than the reduction factor (input numel divided by output numel). (Triggered internally at ..\aten\src\ATen\native\ReduceOps.cpp:1760.)
+  std = sequences.std(dim=-1, correction=1)
+  🔊 Processing: 1781380620303_audio_call.mp4 (ext=.mp4)
+  🔄 Converted with C:\Users\Trooper\AppData\Local\Programs\Python\Python311\Lib\site-packages\imageio_ffmpeg\binaries\ffmpeg-win-x86_64-v7.1.exe: 1781380620303_audio_call_converted.wav (7053000 bytes)
+  📦 WAV: 1ch, 16bit, 16000Hz, 3526461 frames
+  📊 Read: 3526461 samples @ 16000Hz, duration=220.4s
+  📊 Max amplitude: 0.857544
+  🔇 Noise reduction applied (HPF 80Hz + spectral gate)
+  📊 Normalized audio (Gain boost to 0.95 peak)
+  ✅ Output: C:\Users\Trooper\Desktop\Rajesh\ACB\backend\storage\stt_uploads\1781380620303_audio_call_processed.wav (7052966 bytes)
+[Transcriber] Lang=auto, Task=transcribe, Target=en
+[Transcriber] -> Sarvam AI STT (auto)
+  [Sarvam AI] Transcribing in auto-detect...
+  [Sarvam AI] Audio duration: 220.4s
+  [Sarvam AI] Processing 9 chunk(s)...
+  [Sarvam AI] Chunk 1/9 (25.0s)...
+  [Sarvam AI] Auto-detected: te-IN (confidence: None)
+  [Sarvam AI] Chunk 2/9 (25.0s)...
+  [Sarvam AI] Chunk 3/9 (25.0s)...
+  [Sarvam AI] Chunk 4/9 (25.0s)...
+  [Sarvam AI] Chunk 5/9 (25.0s)...
+  [Sarvam AI] Chunk 6/9 (25.0s)...
+  [Sarvam AI] Chunk 7/9 (25.0s)...
+  [Sarvam AI] Chunk 8/9 (25.0s)...
+  [Sarvam AI] Chunk 9/9 (20.4s)...
+  [Sarvam AI] Done in 40.45s: 'హ? రేవంత్ గారు. ఎవరు? నేను ఇంకొకటి నుంచి మాట్లాడుతున్నాను సార్. ఆ మంచిది. ఆ చెప్'
+[Diarizer] Loading pyannote/speaker-diarization-3.1 on cpu…
+[Diarizer] Model loaded ✓
+[Diarizer] 89 segments, 2 speakers detected
+INFO:     127.0.0.1:58846 - "POST /stt/transcribe?language=auto&task=transcribe&target_language=en&diarize=true&num_speakers=0 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56835 - "GET /stt/health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56024 - "GET /stt/health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58375 - "GET /pdf/cases HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56024 - "GET /pdf/cases HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63186 - "GET /cases HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:63186 - "GET /cases HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:60174 - "GET /cases HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:60174 - "GET /cases HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:54610 - "GET /pdf/cases HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54610 - "GET /pdf/cases HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57950 - "GET /pdf/cases HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64824 - "GET /pdf/cases HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62322 - "GET /cases HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:62322 - "GET /cases HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:49806 - "GET /pdf/cases HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49806 - "GET /pdf/cases HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60261 - "GET /cases HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:60261 - "GET /cases HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:56606 - "GET /cases HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:53572 - "GET /docs HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53581 - "GET /openapi.json HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52742 - "GET /cases HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:55735 - "GET /openapi.json HTTP/1.1" 200 OK

@@ -1,0 +1,20 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+venv/
+env/
+*.egg-info/
+dist/
+build/
+
+# pdf-files — ignore uploads/images, track only draft JSON reports
+pdf-files/**
+!pdf-files/
+!pdf-files/**/
+!pdf-files/**/draft_*.json
+
+# Env
+.env
+.env.*
