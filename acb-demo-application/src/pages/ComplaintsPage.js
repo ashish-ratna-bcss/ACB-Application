@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../utils/api';
+import { INDIAN_STATES, STATE_DISTRICTS, GOVERNMENT_DEPARTMENTS, GENDER_OPTIONS } from '../data';
 
 const statusMeta = {
   draft: { label: 'Draft', color: '#64748B', bg: 'rgba(100,116,139,0.13)' },
@@ -36,9 +37,13 @@ export default function ComplaintsPage() {
   const [formError, setFormError] = useState('');
   const [newComplaint, setNewComplaint] = useState({
     complainant: '',
+    complainantGender: '',
     accused: '',
+    accusedGender: '',
     designation: '',
     department: '',
+    state: '',
+    district: '',
     location: '',
     amount: '',
     channel: 'Walk-in',
@@ -94,8 +99,8 @@ export default function ComplaintsPage() {
   }
 
   async function createComplaint() {
-    if (!newComplaint.complainant.trim() || !newComplaint.accused.trim() || !newComplaint.department.trim() || !newComplaint.location.trim()) {
-      setFormError('Please fill Complainant, Accused, Department, and Location.');
+    if (!newComplaint.complainant.trim() || !newComplaint.accused.trim() || !newComplaint.department || !newComplaint.state || !newComplaint.district || !newComplaint.location.trim()) {
+      setFormError('Please fill Complainant, Accused, Department, State, District, and Location.');
       return;
     }
     const amount = Number(newComplaint.amount || 0);
@@ -108,9 +113,13 @@ export default function ComplaintsPage() {
     try {
       await api.createComplaint({
         complainantName: newComplaint.complainant.trim(),
+        complainantGender: newComplaint.complainantGender || undefined,
         accusedName: newComplaint.accused.trim(),
+        accusedGender: newComplaint.accusedGender || undefined,
         accusedDesignation: newComplaint.designation.trim() || undefined,
-        accusedDepartment: newComplaint.department.trim(),
+        accusedDepartment: newComplaint.department,
+        state: newComplaint.state,
+        district: newComplaint.district,
         location: newComplaint.location.trim(),
         amountInvolved: amount,
         channel: newComplaint.channel,
@@ -123,7 +132,7 @@ export default function ComplaintsPage() {
         submitToVerification: newComplaint.submitToVerification,
       });
       setNewComplaint({
-        complainant: '', accused: '', designation: '', department: '', location: '',
+        complainant: '', complainantGender: '', accused: '', accusedGender: '', designation: '', department: '', state: '', district: '', location: '',
         amount: '', channel: 'Walk-in', priority: 'medium', language: 'en', dspId: '',
         summary: '', hasEvidence: false, submitToVerification: false,
       });
@@ -257,9 +266,41 @@ export default function ComplaintsPage() {
               {formError ? <div style={errorBox}>{formError}</div> : null}
               <div style={formGrid}>
                 <Field label="Complainant *"><input value={newComplaint.complainant} onChange={(e) => updateNewComplaint('complainant', e.target.value)} style={input} /></Field>
+                <Field label="Complainant Gender">
+                  <select value={newComplaint.complainantGender} onChange={(e) => updateNewComplaint('complainantGender', e.target.value)} style={input}>
+                    <option value="">— Select Gender —</option>
+                    {GENDER_OPTIONS.map((g) => <option key={g.value} value={g.value}>{g.label}</option>)}
+                  </select>
+                </Field>
                 <Field label="Accused Officer *"><input value={newComplaint.accused} onChange={(e) => updateNewComplaint('accused', e.target.value)} style={input} /></Field>
+                <Field label="Accused Gender">
+                  <select value={newComplaint.accusedGender} onChange={(e) => updateNewComplaint('accusedGender', e.target.value)} style={input}>
+                    <option value="">— Select Gender —</option>
+                    {GENDER_OPTIONS.map((g) => <option key={g.value} value={g.value}>{g.label}</option>)}
+                  </select>
+                </Field>
                 <Field label="Designation"><input value={newComplaint.designation} onChange={(e) => updateNewComplaint('designation', e.target.value)} style={input} /></Field>
-                <Field label="Department *"><input value={newComplaint.department} onChange={(e) => updateNewComplaint('department', e.target.value)} style={input} /></Field>
+                <Field label="Department *">
+                  <select value={newComplaint.department} onChange={(e) => updateNewComplaint('department', e.target.value)} style={input}>
+                    <option value="">— Select Department —</option>
+                    {GOVERNMENT_DEPARTMENTS.map((dept) => <option key={dept} value={dept}>{dept}</option>)}
+                  </select>
+                </Field>
+                <Field label="State *">
+                  <select value={newComplaint.state} onChange={(e) => {
+                    updateNewComplaint('state', e.target.value);
+                    updateNewComplaint('district', '');
+                  }} style={input}>
+                    <option value="">— Select State —</option>
+                    {INDIAN_STATES.map((state) => <option key={state} value={state}>{state}</option>)}
+                  </select>
+                </Field>
+                <Field label="District *">
+                  <select value={newComplaint.district} onChange={(e) => updateNewComplaint('district', e.target.value)} style={input} disabled={!newComplaint.state}>
+                    <option value="">— Select District —</option>
+                    {newComplaint.state && STATE_DISTRICTS[newComplaint.state] ? STATE_DISTRICTS[newComplaint.state].map((district) => <option key={district} value={district}>{district}</option>) : null}
+                  </select>
+                </Field>
                 <Field label="Location *"><input value={newComplaint.location} onChange={(e) => updateNewComplaint('location', e.target.value)} style={input} /></Field>
                 <Field label="Language">
                   <select value={newComplaint.language} onChange={(e) => updateNewComplaint('language', e.target.value)} style={input}>
