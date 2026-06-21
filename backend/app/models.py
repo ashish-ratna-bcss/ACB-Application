@@ -188,6 +188,7 @@ class Document(Base):
     current_stage = Column(String, nullable=True)
     total_pages = Column(Integer, default=0)
     error_message = Column(Text, nullable=True)
+    phase = Column(String, nullable=True)  # complaints | verification | approval | trap | remand | investigation | evidence | court | prosecution | full_case
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
@@ -227,6 +228,7 @@ class SubDocument(Base):
     start_page = Column(Integer)
     end_page = Column(Integer)
     confidence_score = Column(Float)
+    phase = Column(String, nullable=True)  # inherited from parent Document
     created_at = Column(DateTime, default=datetime.utcnow)
 
 

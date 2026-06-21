@@ -33,11 +33,26 @@ function normalizeCases(data) {
     .filter(Boolean);
 }
 
+const CASE_PHASES = [
+  { key: 'full_case', label: 'Full Case Document', description: 'Merged PDF with all documents' },
+  { key: 'complaints', label: 'Complaints', description: 'Initial complaint documents' },
+  { key: 'verification', label: 'Verification', description: 'Documents related to verification' },
+  { key: 'approval', label: 'FIR / Approval', description: 'FIR and approval documents' },
+  { key: 'trap', label: 'Trap Operations', description: 'Trap operation related documents' },
+  { key: 'remand', label: 'Remand', description: 'Remand hearing documents' },
+  { key: 'investigation', label: 'Investigation', description: 'Investigation documents' },
+  { key: 'evidence', label: 'Evidence', description: 'Evidence documents' },
+  { key: 'court', label: 'Court', description: 'Court related documents' },
+  { key: 'prosecution', label: 'Prosecution', description: 'Prosecution documents' },
+];
+
 export default function DocumentProcessorPage() {
   const [cases, setCases] = useState([]);
   const [selectedCase, setSelectedCase] = useState('');
   const [caseSearch, setCaseSearch] = useState('');
   const [caseMenuOpen, setCaseMenuOpen] = useState(false);
+  const [selectedPhase, setSelectedPhase] = useState('');
+  const [phaseMenuOpen, setPhaseMenuOpen] = useState(false);
   const [existingDocs, setExistingDocs] = useState([]);
   const [docsLoading, setDocsLoading] = useState(false);
   const [file, setFile] = useState(null);
@@ -59,8 +74,9 @@ export default function DocumentProcessorPage() {
   const xhrRef = useRef(null);
   const pollRef = useRef(null);
   const caseMenuRef = useRef(null);
+  const phaseMenuRef = useRef(null);
 
-  const canGenerate = !!selectedCase && !!file && uiStage === 'idle';
+  const canGenerate = !!selectedCase && !!selectedPhase && !!file && uiStage === 'idle';
   const isBusy = uiStage === 'uploading' || uiStage === 'uploaded' || uiStage === 'processing';
   const selectedCaseDocs = useMemo(() => existingDocs || [], [existingDocs]);
   const selectedCaseItem = useMemo(() => cases.find((item) => item.id === selectedCase) || null, [cases, selectedCase]);
@@ -143,6 +159,7 @@ export default function DocumentProcessorPage() {
   useEffect(() => {
     const onClickOutside = (event) => {
       if (!caseMenuRef.current?.contains(event.target)) setCaseMenuOpen(false);
+      if (!phaseMenuRef.current?.contains(event.target)) setPhaseMenuOpen(false);
     };
     document.addEventListener('mousedown', onClickOutside);
     return () => document.removeEventListener('mousedown', onClickOutside);
@@ -195,6 +212,7 @@ export default function DocumentProcessorPage() {
     setLogs([]);
     setStageProgress({});
     setFile(null);
+    setSelectedPhase('');
     if (fileInputRef.current) fileInputRef.current.value = '';
   }, [stopPolling]);
 
@@ -203,6 +221,7 @@ export default function DocumentProcessorPage() {
       new Promise((resolve, reject) => {
         const formData = new FormData();
         formData.append('caseId', selectedCase);
+        formData.append('phase', selectedPhase);
         formData.append('file', selectedFile);
 
         const xhr = new XMLHttpRequest();
@@ -230,7 +249,7 @@ export default function DocumentProcessorPage() {
         xhr.open('POST', `${BACKEND_URL}/pdf/upload`);
         xhr.send(formData);
       }),
-    [selectedCase]
+    [selectedCase, selectedPhase]
   );
 
   const handleGenerate = useCallback(async () => {
@@ -275,6 +294,7 @@ export default function DocumentProcessorPage() {
 
   const onSelectCase = (caseId) => {
     setSelectedCase(caseId);
+    setSelectedPhase('');
     reset();
     if (caseId) fetchCaseDocs(caseId);
     else setExistingDocs([]);
@@ -353,6 +373,57 @@ export default function DocumentProcessorPage() {
 
           {selectedCase && (
             <div style={card}>
+              <h3 style={h3}>Document Stage</h3>
+              <div style={selectField}>
+                <label style={label}>Select Case Phase/Stage</label>
+                <div ref={phaseMenuRef} style={dropdownWrap}>
+                  <button
+                    type="button"
+                    disabled={isBusy}
+                    onClick={() => !isBusy && setPhaseMenuOpen((prev) => !prev)}
+                    style={{ ...dropdownTrigger, opacity: isBusy ? 0.7 : 1 }}
+                  >
+                    <span style={{ ...dropdownValue, color: selectedPhase ? 'var(--text)' : 'var(--text-3)' }}>
+                      {selectedPhase ? CASE_PHASES.find((p) => p.key === selectedPhase)?.label : '— Choose a phase —'}
+                    </span>
+                    <span style={dropdownChevron}>{phaseMenuOpen ? '▴' : '▾'}</span>
+                  </button>
+
+                  {phaseMenuOpen && !isBusy && (
+                    <div style={dropdownPanel}>
+                      <div style={dropdownList}>
+                        <button
+                          type="button"
+                          onClick={() => setSelectedPhase('')}
+                          style={{ ...dropdownItem, ...(selectedPhase === '' ? dropdownItemActive : null) }}
+                        >
+                          — Choose a phase —
+                        </button>
+                        {CASE_PHASES.map((phase) => (
+                          <button
+                            key={phase.key}
+                            type="button"
+                            onClick={() => {
+                              setSelectedPhase(phase.key);
+                              setPhaseMenuOpen(false);
+                            }}
+                            style={{ ...dropdownItem, ...(selectedPhase === phase.key ? dropdownItemActive : null), flexDirection: 'column', alignItems: 'flex-start', gap: '4px' }}
+                          >
+                            <div style={{ fontSize: '12px', fontWeight: 700 }}>{phase.label}</div>
+                            <div style={{ fontSize: '11px', color: 'var(--text-3)' }}>{phase.description}</div>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+                <div style={selectHint}>Select where this document belongs in the case workflow.</div>
+              </div>
+            </div>
+          )}
+
+          {selectedCase && (
+            <div style={card}>
               <h3 style={h3}>Uploaded Documents</h3>
               {docsLoading ? (
                 <div style={muted}>Loading…</div>
@@ -360,14 +431,16 @@ export default function DocumentProcessorPage() {
                 <div style={muted}>No documents uploaded yet for this case.</div>
               ) : (
                 <div style={{ display: 'grid', gap: '8px' }}>
-                  {selectedCaseDocs.map((doc) => (
+                  {selectedCaseDocs.map((doc) => {
+                    const phaseLabel = doc.phase ? CASE_PHASES.find((p) => p.key === doc.phase)?.label || doc.phase : 'No phase';
+                    return (
                     <div key={doc.document_id} style={{ ...docRow, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
                       <div style={{ minWidth: 0 }}>
                         <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                           {doc.original_name || doc.file_name}
                         </div>
                         <div style={{ fontSize: '11px', color: 'var(--text-3)' }}>
-                          {doc.status} {doc.total_pages > 0 ? `· ${doc.total_pages} pages` : ''}
+                          {doc.status} {doc.total_pages > 0 ? `· ${doc.total_pages} pages` : ''} · {phaseLabel}
                         </div>
                       </div>
                       {doc.file_name ? (
@@ -385,7 +458,8 @@ export default function DocumentProcessorPage() {
                         </a>
                       ) : null}
                     </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </div>

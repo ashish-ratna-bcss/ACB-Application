@@ -287,6 +287,7 @@ def run_pipeline(document_id: int, case_id: str, file_name: str, start_stage: st
                     start_page=start,
                     end_page=end,
                     confidence_score=float(subdoc_meta.get("confidence", 0.5)),
+                    phase=doc.phase,
                 )
                 db.add(sd)
                 db.flush()

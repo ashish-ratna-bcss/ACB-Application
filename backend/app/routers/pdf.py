@@ -31,6 +31,7 @@ _CASE_ID_RE = re.compile(r"^[A-Za-z0-9_-]+$")
 async def upload_pdf(
     background_tasks: BackgroundTasks,
     case_id: str = Form(..., alias="caseId"),
+    phase: str = Form(default=None),
     file: UploadFile = File(...),
 ):
     case_id = case_id.strip()
@@ -68,6 +69,7 @@ async def upload_pdf(
             original_name=file.filename,
             file_path=str(dest_path),
             status="uploaded",
+            phase=phase,
         )
         db.add(doc)
         db.commit()
@@ -86,6 +88,7 @@ async def upload_pdf(
             "case_id": case_id,
             "file_name": safe_name,
             "original_name": file.filename,
+            "phase": phase,
             "size_bytes": len(contents),
             "size_mb": round(size_mb, 3),
             "status": "uploaded",
@@ -248,6 +251,7 @@ def list_pdfs():
                     "original_name": d.original_name,
                     "status": d.status,
                     "total_pages": d.total_pages,
+                    "phase": d.phase,
                     "created_at": d.created_at.isoformat() if d.created_at else None,
                 }
                 for d in docs
@@ -804,6 +808,7 @@ def get_case_detail(case_id: str):
                 "status": d.status,
                 "current_stage": d.current_stage,
                 "total_pages": d.total_pages or 0,
+                "phase": d.phase,
                 "error_message": d.error_message,
                 "created_at": d.created_at.isoformat() if d.created_at else None,
                 "completed_stages": completed_stages,

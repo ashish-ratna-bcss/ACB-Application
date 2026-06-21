@@ -43,16 +43,19 @@ export default function Sidebar() {
   const phaseRoutes = ['verification', 'approval', 'trap', 'remand', 'investigation', 'evidence', 'court', 'prosecution'];
   const activePhase = pathParts[0] && phaseRoutes.includes(pathParts[0]) ? pathParts[0] : null;
 
-  const workspaceNav = [
+  const generalNav = [
     { id: 'dashboard', label: 'Dashboard', path: '/' },
-    { id: 'complaints', label: 'Complaints', path: '/complaints', badge: complaintCount != null ? String(complaintCount) : null },
-    { id: 'processor', label: 'Document Processor', path: '/document-processor' },
-    { id: 'reports', label: 'Case Reports', path: '/case-reports' },
-    { id: 'speech', label: 'Speech Intelligence', path: '/speech-intelligence' },
     { id: 'settings', label: 'Settings', path: '/settings', iconPath: 'M19 11.5A8.5 8.5 0 0 0 11.5 3H7a5 5 0 0 0-5 5v6a5 5 0 0 0 5 5h4.5a8.5 8.5 0 0 0 7.5-8.5M12 8v4m0 4v-4' },
   ];
 
+  const workspaceNav = [
+    { id: 'processor', label: 'Document Processor', path: '/document-processor' },
+    { id: 'reports', label: 'Case Reports', path: '/case-reports' },
+    { id: 'speech', label: 'Speech Intelligence', path: '/speech-intelligence' },
+  ];
+
   const phaseNav = [
+    { id: 'complaints', label: 'Complaints', route: 'complaints', path: '/complaints', isComplaints: true, badge: complaintCount },
     { id: 'verification', label: 'Verification', route: 'verification' },
     { id: 'fir', label: 'FIR / Approval', route: 'approval' },
     { id: 'trap', label: 'Trap Operations', route: 'trap' },
@@ -63,8 +66,8 @@ export default function Sidebar() {
     { id: 'prosecution', label: 'Prosecution', route: 'prosecution' },
   ].map((item) => ({
     ...item,
-    locked: isPhaseNavLocked(item.route, phaseCounts),
-    count: phaseCounts[item.route],
+    locked: item.isComplaints ? false : isPhaseNavLocked(item.route, phaseCounts),
+    count: item.isComplaints ? null : phaseCounts[item.route],
   }));
 
   const systemNav = [
@@ -92,8 +95,9 @@ export default function Sidebar() {
       </div>
 
       <nav style={{ flex: 1, overflowY: 'auto', padding: '14px 12px' }}>
-        <NavSection title="Workspace" items={workspaceNav} currentPath={currentPath} navigate={navigate} navIcon={navIcon} navItemStyle={navItemStyle} />
+        <NavSection title="General" items={generalNav} currentPath={currentPath} navigate={navigate} navIcon={navIcon} navItemStyle={navItemStyle} />
         <NavSection title="Case Phases" items={phaseNav} currentPath={currentPath} navigate={navigate} navIcon={navIcon} navItemStyle={navItemStyle} isPhase />
+        <NavSection title="Workspace" items={workspaceNav} currentPath={currentPath} navigate={navigate} navIcon={navIcon} navItemStyle={navItemStyle} />
         <NavSection title="System" items={systemNav} currentPath={currentPath} navigate={navigate} navIcon={navIcon} navItemStyle={navItemStyle} />
       </nav>
 
