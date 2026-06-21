@@ -71,10 +71,15 @@ class CaseResponse(BaseModel):
 
     id: str
     case_number: str
+    tracking_id: Optional[str] = None
     title: str
     type: str
     fir_number: Optional[str] = None
     status: str
+    current_phase: Optional[str] = "complaint"
+    phase_substatus: Optional[str] = "draft"
+    priority: Optional[str] = "medium"
+    language: Optional[str] = "en"
     officer_id: Optional[str] = None
     officer_name: Optional[str] = None
     officer_department: Optional[str] = None
@@ -97,10 +102,15 @@ def _to_response(c: Case) -> dict[str, Any]:
     return CaseResponse(
         id=c.id,
         case_number=c.case_number,
+        tracking_id=getattr(c, "tracking_id", None),
         title=c.title,
         type=c.type,
         fir_number=c.fir_number,
         status=c.status or "active",
+        current_phase=getattr(c, "current_phase", None) or "complaint",
+        phase_substatus=getattr(c, "phase_substatus", None) or "draft",
+        priority=getattr(c, "priority", None) or "medium",
+        language=getattr(c, "language", None) or "en",
         officer_id=c.officer_id,
         officer_name=c.officer_name,
         officer_department=c.officer_department,

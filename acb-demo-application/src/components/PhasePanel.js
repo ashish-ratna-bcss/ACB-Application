@@ -1,6 +1,6 @@
 import React from 'react';
 
-export default function PhasePanel({ panel, statusMeta }) {
+export default function PhasePanel({ panel, statusMeta, onCheckpointToggle }) {
   if (!panel) return null;
   
   return (
@@ -30,8 +30,14 @@ export default function PhasePanel({ panel, statusMeta }) {
               const border = done ? '#16A34A' : '#94A3B8';
               const iconColor = done ? '#16A34A' : '#94A3B8';
               const textColor = done ? 'var(--text)' : 'var(--text-3)';
+              const key = cp.key || cp.label?.toLowerCase().replace(/\s+/g, '_');
               return (
-                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '11px' }}>
+                <div
+                  key={i}
+                  style={{ display: 'flex', alignItems: 'center', gap: '11px', cursor: onCheckpointToggle ? 'pointer' : 'default' }}
+                  onClick={() => onCheckpointToggle?.(key, !done)}
+                  role={onCheckpointToggle ? 'button' : undefined}
+                >
                   <span style={{ width: '20px', height: '20px', borderRadius: '50%', flexShrink: 0, background: bg, border: `1.5px solid ${border}`, display: 'flex', alignItems: 'center', justifyContent: 'center', color: iconColor }}>
                     <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d={icon}></path></svg>
                   </span>

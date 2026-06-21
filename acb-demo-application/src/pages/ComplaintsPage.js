@@ -1,20 +1,11 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-
-const complaintsSeed = [
-  { id: 'CMP-2026-0187', complainant: 'Sri M. Srinivas', accused: 'Sri K. Venkateswara Rao', designation: 'Assistant Engineer', department: 'Panchayat Raj', location: 'Warangal', amount: 50000, channel: 'Walk-in', priority: 'high', status: 'verification', submittedOn: '2026-06-16T09:20:00' },
-  { id: 'CMP-2026-0189', complainant: 'Smt. P. Lalitha', accused: 'Sri B. Ramesh', designation: 'Sub-Registrar', department: 'Registration & Stamps', location: 'Karimnagar', amount: 100000, channel: 'Online Portal', priority: 'critical', status: 'approval', submittedOn: '2026-06-17T12:05:00' },
-  { id: 'CMP-2026-0191', complainant: 'Sri N. Harish', accused: 'Smt. P. Lakshmi', designation: 'Revenue Inspector', department: 'Revenue', location: 'Rangareddy', amount: 25000, channel: 'Helpline', priority: 'medium', status: 'drafting', submittedOn: '2026-06-17T16:40:00' },
-  { id: 'CMP-2026-0194', complainant: 'Sri A. Raju', accused: 'Sri A. Saidulu', designation: 'MPDO', department: 'Rural Development', location: 'Nalgonda', amount: 75000, channel: 'Walk-in', priority: 'high', status: 'verification', submittedOn: '2026-06-18T08:35:00' },
-  { id: 'CMP-2026-0196', complainant: 'Sri V. Prasad', accused: 'Sri N. Prasad', designation: 'AEE', department: 'Irrigation', location: 'Khammam', amount: 200000, channel: 'Vigilance Forward', priority: 'critical', status: 'assigned', submittedOn: '2026-06-18T10:25:00' },
-  { id: 'CMP-2026-0198', complainant: 'Smt. B. Kavitha', accused: 'Sri P. Gopal', designation: 'Municipal Officer', department: 'Municipal Administration', location: 'Hyderabad', amount: 40000, channel: 'Online Portal', priority: 'low', status: 'assigned', submittedOn: '2026-06-18T11:45:00' },
-];
+import { api } from '../utils/api';
 
 const statusMeta = {
+  draft: { label: 'Draft', color: '#64748B', bg: 'rgba(100,116,139,0.13)' },
   assigned: { label: 'Assigned', color: '#2563EB', bg: 'rgba(37,99,235,0.12)' },
-  verification: { label: 'Verification', color: '#0F7A3D', bg: 'rgba(0,200,83,0.13)' },
-  drafting: { label: 'Drafting Note', color: '#7C3AED', bg: 'rgba(124,58,237,0.13)' },
-  approval: { label: 'Approval Queue', color: '#B45309', bg: 'rgba(217,119,6,0.15)' },
+  submitted: { label: 'Submitted', color: '#0F7A3D', bg: 'rgba(0,200,83,0.13)' },
 };
 
 const priorityMeta = {
@@ -26,16 +17,24 @@ const priorityMeta = {
 
 const currency = new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 });
 
+const DSP_OPTIONS = [
+  { id: 'dsp-001', name: 'DSP Ramesh Kumar' },
+  { id: 'dsp-002', name: 'DSP Kiran Reddy' },
+  { id: 'dsp-003', name: 'DSP Venkat Rao' },
+];
+
 export default function ComplaintsPage() {
   const navigate = useNavigate();
-  const [complaints, setComplaints] = useState(complaintsSeed);
+  const [complaints, setComplaints] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState('all');
   const [priority, setPriority] = useState('all');
   const [sortBy, setSortBy] = useState('newest');
   const [createOpen, setCreateOpen] = useState(false);
   const [formError, setFormError] = useState('');
-  const [newComplaint, setNewComplaint] = useState(() => ({
+  const [newComplaint, setNewComplaint] = useState({
     complainant: '',
     accused: '',
     designation: '',
@@ -44,36 +43,49 @@ export default function ComplaintsPage() {
     amount: '',
     channel: 'Walk-in',
     priority: 'medium',
-    status: 'assigned',
-  }));
+    language: 'en',
+    dspId: '',
+    summary: '',
+    hasEvidence: false,
+    submitToVerification: false,
+  });
+
+  const loadComplaints = useCallback(() => {
+    setLoading(true);
+    api.getComplaints()
+      .then((data) => setComplaints(Array.isArray(data) ? data : []))
+      .catch((e) => setError(e.message))
+      .finally(() => setLoading(false));
+  }, []);
+
+  useEffect(() => { loadComplaints(); }, [loadComplaints]);
 
   const filteredComplaints = useMemo(() => {
     const q = search.trim().toLowerCase();
     return complaints
-      .filter((complaint) => {
-        const matchesSearch = !q || [complaint.id, complaint.complainant, complaint.accused, complaint.department, complaint.location]
-          .some((field) => field.toLowerCase().includes(q));
-        const matchesStatus = status === 'all' || complaint.status === status;
-        const matchesPriority = priority === 'all' || complaint.priority === priority;
+      .filter((c) => {
+        const matchesSearch = !q || [c.trackingId, c.complainantName, c.accusedName, c.accusedDepartment, c.location]
+          .filter(Boolean)
+          .some((field) => String(field).toLowerCase().includes(q));
+        const matchesStatus = status === 'all' || c.status === status;
+        const matchesPriority = priority === 'all' || c.priority === priority;
         return matchesSearch && matchesStatus && matchesPriority;
       })
       .sort((a, b) => {
-        if (sortBy === 'amount') {
-          return b.amount - a.amount;
-        }
+        if (sortBy === 'amount') return (b.amountInvolved || 0) - (a.amountInvolved || 0);
         if (sortBy === 'priority') {
           const order = { critical: 4, high: 3, medium: 2, low: 1 };
-          return order[b.priority] - order[a.priority];
+          return (order[b.priority] || 0) - (order[a.priority] || 0);
         }
-        return new Date(b.submittedOn).getTime() - new Date(a.submittedOn).getTime();
+        return new Date(b.submittedOn || 0).getTime() - new Date(a.submittedOn || 0).getTime();
       });
   }, [complaints, search, status, priority, sortBy]);
 
   const stats = useMemo(() => ({
     total: complaints.length,
-    critical: complaints.filter((complaint) => complaint.priority === 'critical').length,
-    verification: complaints.filter((complaint) => complaint.status === 'verification').length,
-    avgAmount: complaints.length ? complaints.reduce((sum, complaint) => sum + complaint.amount, 0) / complaints.length : 0,
+    critical: complaints.filter((c) => c.priority === 'critical').length,
+    submitted: complaints.filter((c) => c.status === 'submitted').length,
+    avgAmount: complaints.length ? complaints.reduce((s, c) => s + (c.amountInvolved || 0), 0) / complaints.length : 0,
   }), [complaints]);
 
   function updateNewComplaint(field, value) {
@@ -81,7 +93,7 @@ export default function ComplaintsPage() {
     if (formError) setFormError('');
   }
 
-  function createComplaint() {
+  async function createComplaint() {
     if (!newComplaint.complainant.trim() || !newComplaint.accused.trim() || !newComplaint.department.trim() || !newComplaint.location.trim()) {
       setFormError('Please fill Complainant, Accused, Department, and Location.');
       return;
@@ -92,37 +104,44 @@ export default function ComplaintsPage() {
       return;
     }
 
-    const nextId = `CMP-${new Date().getFullYear()}-${String(Math.floor(1000 + Math.random() * 9000))}`;
-    setComplaints((prev) => ([
-      {
-        id: nextId,
-        complainant: newComplaint.complainant.trim(),
-        accused: newComplaint.accused.trim(),
-        designation: newComplaint.designation.trim() || 'Not specified',
-        department: newComplaint.department.trim(),
+    const dsp = DSP_OPTIONS.find((d) => d.id === newComplaint.dspId);
+    try {
+      await api.createComplaint({
+        complainantName: newComplaint.complainant.trim(),
+        accusedName: newComplaint.accused.trim(),
+        accusedDesignation: newComplaint.designation.trim() || undefined,
+        accusedDepartment: newComplaint.department.trim(),
         location: newComplaint.location.trim(),
-        amount,
+        amountInvolved: amount,
         channel: newComplaint.channel,
         priority: newComplaint.priority,
-        status: newComplaint.status,
-        submittedOn: new Date().toISOString(),
-      },
-      ...prev,
-    ]));
+        language: newComplaint.language,
+        summary: newComplaint.summary || undefined,
+        hasEvidence: newComplaint.hasEvidence,
+        dspId: dsp?.id,
+        dspName: dsp?.name,
+        submitToVerification: newComplaint.submitToVerification,
+      });
+      setNewComplaint({
+        complainant: '', accused: '', designation: '', department: '', location: '',
+        amount: '', channel: 'Walk-in', priority: 'medium', language: 'en', dspId: '',
+        summary: '', hasEvidence: false, submitToVerification: false,
+      });
+      setCreateOpen(false);
+      loadComplaints();
+    } catch (e) {
+      setFormError(e.message);
+    }
+  }
 
-    setNewComplaint({
-      complainant: '',
-      accused: '',
-      designation: '',
-      department: '',
-      location: '',
-      amount: '',
-      channel: 'Walk-in',
-      priority: 'medium',
-      status: 'assigned',
-    });
-    setCreateOpen(false);
-    setFormError('');
+  async function submitToVerification(complaint) {
+    try {
+      await api.submitComplaint(complaint.id);
+      loadComplaints();
+      navigate('/verification');
+    } catch (e) {
+      setError(e.message);
+    }
   }
 
   return (
@@ -130,79 +149,56 @@ export default function ComplaintsPage() {
       <section style={{ background: 'linear-gradient(135deg, #0E141F 0%, #162236 100%)', border: '1px solid #1C2A40', borderRadius: '14px', padding: '20px 22px', boxShadow: 'var(--shadow)' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '16px', flexWrap: 'wrap' }}>
           <div>
-            <div style={{ fontSize: '11px', letterSpacing: '0.8px', textTransform: 'uppercase', color: '#7F93AE', fontWeight: 600, marginBottom: '8px' }}>Complaint Intake Desk</div>
+            <div style={{ fontSize: '11px', letterSpacing: '0.8px', textTransform: 'uppercase', color: '#7F93AE', fontWeight: 600, marginBottom: '8px' }}>Complaint Intake Engine</div>
             <h1 style={{ margin: 0, fontSize: '28px', color: '#F8FAFC', fontWeight: 700 }}>Complaints Command Center</h1>
-            <p style={{ margin: '8px 0 0', color: '#B8C7DA', fontSize: '14px', maxWidth: '720px' }}>Track new complaints, prioritize sensitive bribery allegations, and push high-risk entries into verification and approval workflow quickly.</p>
+            <p style={{ margin: '8px 0 0', color: '#B8C7DA', fontSize: '14px', maxWidth: '720px' }}>Create draft complaints with language preferences, assign DSPs, generate tracking IDs, and initiate the case lifecycle.</p>
           </div>
           <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
-            <button onClick={() => navigate('/verification')} style={{ border: '1px solid #35507A', background: '#1D2F4E', color: '#E2E8F0', fontSize: '13px', fontWeight: 600, borderRadius: '10px', padding: '10px 14px' }}>Send to Verification</button>
+            <button onClick={() => navigate('/verification')} style={{ border: '1px solid #35507A', background: '#1D2F4E', color: '#E2E8F0', fontSize: '13px', fontWeight: 600, borderRadius: '10px', padding: '10px 14px' }}>Verification Queue</button>
             <button onClick={() => setCreateOpen(true)} style={{ border: '1px solid #00A84A', background: '#00C853', color: '#052E16', fontSize: '13px', fontWeight: 700, borderRadius: '10px', padding: '10px 14px' }}>Create Complaint</button>
           </div>
         </div>
       </section>
 
+      {error ? <div style={errorBox}>{error}</div> : null}
+
       <section style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '12px' }}>
-        <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '12px', padding: '14px 16px', boxShadow: 'var(--shadow)' }}>
-          <div style={{ fontSize: '11px', color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.5px', fontWeight: 600 }}>Total Complaints</div>
-          <div style={{ marginTop: '8px', fontSize: '29px', fontWeight: 700, color: 'var(--text)', lineHeight: 1 }}>{stats.total}</div>
-        </div>
-        <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '12px', padding: '14px 16px', boxShadow: 'var(--shadow)' }}>
-          <div style={{ fontSize: '11px', color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.5px', fontWeight: 600 }}>Critical Priority</div>
-          <div style={{ marginTop: '8px', fontSize: '29px', fontWeight: 700, color: '#B91C1C', lineHeight: 1 }}>{stats.critical}</div>
-        </div>
-        <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '12px', padding: '14px 16px', boxShadow: 'var(--shadow)' }}>
-          <div style={{ fontSize: '11px', color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.5px', fontWeight: 600 }}>In Verification</div>
-          <div style={{ marginTop: '8px', fontSize: '29px', fontWeight: 700, color: '#0F7A3D', lineHeight: 1 }}>{stats.verification}</div>
-        </div>
-        <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '12px', padding: '14px 16px', boxShadow: 'var(--shadow)' }}>
-          <div style={{ fontSize: '11px', color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.5px', fontWeight: 600 }}>Average Bribe Demand</div>
-          <div style={{ marginTop: '8px', fontSize: '29px', fontWeight: 700, color: '#1D4ED8', lineHeight: 1 }}>{currency.format(stats.avgAmount)}</div>
-        </div>
+        <StatCard label="Total Complaints" value={stats.total} />
+        <StatCard label="Critical Priority" value={stats.critical} color="#B91C1C" />
+        <StatCard label="Submitted" value={stats.submitted} color="#0F7A3D" />
+        <StatCard label="Average Bribe Demand" value={currency.format(stats.avgAmount)} color="#1D4ED8" />
       </section>
 
       <section style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '12px', boxShadow: 'var(--shadow)', overflow: 'hidden' }}>
-        <div style={{ padding: '14px 16px', borderBottom: '1px solid var(--border)', display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'center' }}>
-          <div style={{ flex: '1 1 280px', minWidth: '240px' }}>
-            <input
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-              placeholder="Search by complaint ID, complainant, accused, department..."
-              style={{ width: '100%', border: '1px solid var(--border)', borderRadius: '10px', padding: '10px 12px', fontSize: '13px', color: 'var(--text)', background: 'var(--surface-2)' }}
-            />
-          </div>
-          <select value={status} onChange={(event) => setStatus(event.target.value)} style={filterSelect}>
+        <div style={{ padding: '14px 16px', borderBottom: '1px solid var(--border)', display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+          <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search by tracking ID, complainant, accused..." style={{ ...input, flex: '1 1 280px' }} />
+          <select value={status} onChange={(e) => setStatus(e.target.value)} style={filterSelect}>
             <option value="all">All Status</option>
+            <option value="draft">Draft</option>
             <option value="assigned">Assigned</option>
-            <option value="verification">Verification</option>
-            <option value="drafting">Drafting</option>
-            <option value="approval">Approval Queue</option>
+            <option value="submitted">Submitted</option>
           </select>
-          <select value={priority} onChange={(event) => setPriority(event.target.value)} style={filterSelect}>
+          <select value={priority} onChange={(e) => setPriority(e.target.value)} style={filterSelect}>
             <option value="all">All Priority</option>
             <option value="critical">Critical</option>
             <option value="high">High</option>
             <option value="medium">Medium</option>
             <option value="low">Low</option>
           </select>
-          <select value={sortBy} onChange={(event) => setSortBy(event.target.value)} style={filterSelect}>
+          <select value={sortBy} onChange={(e) => setSortBy(e.target.value)} style={filterSelect}>
             <option value="newest">Sort: Newest</option>
             <option value="amount">Sort: Amount</option>
             <option value="priority">Sort: Priority</option>
           </select>
         </div>
 
-        <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: 0, minWidth: '940px' }}>
-            <colgroup>
-              <col style={{ width: '18%' }} />
-              <col style={{ width: '33%' }} />
-              <col style={{ width: '17%' }} />
-              <col style={{ width: '20%' }} />
-              <col style={{ width: '12%' }} />
-            </colgroup>
+        {loading ? (
+          <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-3)' }}>Loading complaints…</div>
+        ) : (
+          <table style={{ width: '100%', borderCollapse: 'separate', minWidth: '940px' }}>
             <thead>
               <tr style={{ background: 'var(--surface-2)' }}>
-                <th style={th}>Complaint</th>
+                <th style={th}>Tracking ID</th>
                 <th style={th}>Complainant & Accused</th>
                 <th style={{ ...th, textAlign: 'right' }}>Risk</th>
                 <th style={th}>Workflow</th>
@@ -210,42 +206,41 @@ export default function ComplaintsPage() {
               </tr>
             </thead>
             <tbody>
-              {filteredComplaints.map((complaint) => {
-                const statusPill = statusMeta[complaint.status];
-                const priorityPill = priorityMeta[complaint.priority];
+              {filteredComplaints.map((c) => {
+                const st = statusMeta[c.status] || statusMeta.draft;
+                const pr = priorityMeta[c.priority] || priorityMeta.medium;
                 return (
-                  <tr
-                    key={complaint.id}
-                    style={{ background: 'var(--surface)', transition: 'background 120ms ease' }}
-                    onMouseEnter={(event) => { event.currentTarget.style.background = 'var(--surface-2)'; }}
-                    onMouseLeave={(event) => { event.currentTarget.style.background = 'var(--surface)'; }}
-                  >
+                  <tr key={c.id}>
                     <td style={td}>
-                      <div style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: '12.5px', fontWeight: 600, color: 'var(--text)' }}>{complaint.id}</div>
-                      <div style={{ fontSize: '11px', color: 'var(--text-3)', marginTop: '4px' }}>{formatSubmitted(complaint.submittedOn)}</div>
+                      <div style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: '12.5px', fontWeight: 600 }}>{c.trackingId}</div>
+                      <div style={{ fontSize: '11px', color: 'var(--text-3)', marginTop: '4px' }}>{formatSubmitted(c.submittedOn)} · {c.language === 'te' ? 'Telugu' : 'English'}</div>
                     </td>
                     <td style={td}>
-                      <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text)' }}>{complaint.complainant}</div>
-                      <div style={{ fontSize: '11px', color: 'var(--text-3)', marginTop: '2px' }}>{complaint.accused} • {complaint.designation}</div>
-                      <div style={{ fontSize: '11px', color: 'var(--text-3)', marginTop: '4px' }}>{complaint.department} • {complaint.location}</div>
+                      <div style={{ fontSize: '13px', fontWeight: 600 }}>{c.complainantName}</div>
+                      <div style={{ fontSize: '11px', color: 'var(--text-3)' }}>{c.accusedName} • {c.accusedDesignation || '—'}</div>
+                      <div style={{ fontSize: '11px', color: 'var(--text-3)' }}>{c.accusedDepartment} • {c.location}</div>
                     </td>
                     <td style={{ ...td, textAlign: 'right' }}>
-                      <div style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: '13px', fontWeight: 700, color: 'var(--text)' }}>{currency.format(complaint.amount)}</div>
-                      <span style={{ display: 'inline-flex', alignItems: 'center', marginTop: '6px', fontSize: '11px', fontWeight: 600, borderRadius: '999px', padding: '3px 9px', color: priorityPill.color, background: priorityPill.bg }}>{priorityPill.label}</span>
+                      <div style={{ fontFamily: "'JetBrains Mono',monospace", fontWeight: 700 }}>{currency.format(c.amountInvolved || 0)}</div>
+                      <span style={{ ...pill, color: pr.color, background: pr.bg }}>{pr.label}</span>
                     </td>
                     <td style={td}>
-                      <span style={{ display: 'inline-flex', alignItems: 'center', fontSize: '11px', fontWeight: 600, borderRadius: '999px', padding: '3px 9px', color: statusPill.color, background: statusPill.bg }}>{statusPill.label}</span>
-                      <div style={{ fontSize: '11px', color: 'var(--text-3)', marginTop: '6px' }}>{complaint.channel}</div>
+                      <span style={{ ...pill, color: st.color, background: st.bg }}>{st.label}</span>
+                      <div style={{ fontSize: '11px', color: 'var(--text-3)', marginTop: '6px' }}>{c.dspName || c.channel}</div>
                     </td>
                     <td style={{ ...td, textAlign: 'right' }}>
-                      <button onClick={() => navigate('/verification')} style={{ border: '1px solid var(--border)', background: 'var(--surface-2)', color: 'var(--text)', fontSize: '12px', fontWeight: 600, borderRadius: '8px', padding: '7px 10px' }}>Open</button>
+                      {c.status !== 'submitted' ? (
+                        <button onClick={() => submitToVerification(c)} style={actionBtn}>Submit</button>
+                      ) : (
+                        <button onClick={() => navigate('/verification')} style={actionBtn}>Open</button>
+                      )}
                     </td>
                   </tr>
                 );
               })}
             </tbody>
           </table>
-        </div>
+        )}
       </section>
 
       {createOpen ? (
@@ -253,83 +248,62 @@ export default function ComplaintsPage() {
           <div style={modalCard}>
             <div style={modalHead}>
               <div>
-                <div style={{ fontSize: '11px', letterSpacing: '0.7px', textTransform: 'uppercase', color: '#9FB3C8', fontWeight: 700 }}>New Complaint</div>
-                <h2 style={{ margin: '6px 0 0', fontSize: '21px', color: '#F8FAFC' }}>Register Complaint</h2>
-                <p style={{ margin: '6px 0 0', fontSize: '12px', color: '#BFD0DF' }}>Capture complaint details and add it directly to intake queue.</p>
+                <h2 style={{ margin: '6px 0 0', fontSize: '21px', color: '#F8FAFC' }}>Register Draft Complaint</h2>
+                <p style={{ margin: '6px 0 0', fontSize: '12px', color: '#BFD0DF' }}>Creates a case with unique tracking ID and optional verification submission.</p>
               </div>
-              <button onClick={() => { setCreateOpen(false); setFormError(''); }} style={closeBtn}>✕</button>
+              <button onClick={() => setCreateOpen(false)} style={closeBtn}>✕</button>
             </div>
-
             <div style={modalBody}>
               {formError ? <div style={errorBox}>{formError}</div> : null}
-
-              <div style={formSection}>
-                <div style={sectionTitle}>People & Incident</div>
-                <div style={formGrid}>
-                  <div>
-                    <label style={label}>Complainant *</label>
-                    <input value={newComplaint.complainant} onChange={(event) => updateNewComplaint('complainant', event.target.value)} style={input} placeholder="Enter complainant name" />
-                  </div>
-                  <div>
-                    <label style={label}>Accused Officer *</label>
-                    <input value={newComplaint.accused} onChange={(event) => updateNewComplaint('accused', event.target.value)} style={input} placeholder="Enter accused officer name" />
-                  </div>
-                  <div>
-                    <label style={label}>Designation</label>
-                    <input value={newComplaint.designation} onChange={(event) => updateNewComplaint('designation', event.target.value)} style={input} placeholder="e.g. Assistant Engineer" />
-                  </div>
-                  <div>
-                    <label style={label}>Department *</label>
-                    <input value={newComplaint.department} onChange={(event) => updateNewComplaint('department', event.target.value)} style={input} placeholder="Enter department" />
-                  </div>
-                  <div style={spanTwoCols}>
-                    <label style={label}>Location *</label>
-                    <input value={newComplaint.location} onChange={(event) => updateNewComplaint('location', event.target.value)} style={input} placeholder="Enter incident location" />
-                  </div>
-                </div>
-              </div>
-
-              <div style={formSection}>
-                <div style={sectionTitle}>Workflow Classification</div>
-                <div style={formGrid}>
-                  <div>
-                    <label style={label}>Bribe Amount (₹)</label>
-                    <input value={newComplaint.amount} onChange={(event) => updateNewComplaint('amount', event.target.value)} style={input} placeholder="e.g. 50000" type="number" min="0" />
-                  </div>
-                  <div>
-                    <label style={label}>Channel</label>
-                    <select value={newComplaint.channel} onChange={(event) => updateNewComplaint('channel', event.target.value)} style={selectInput}>
-                      <option>Walk-in</option>
-                      <option>Online Portal</option>
-                      <option>Helpline</option>
-                      <option>Vigilance Forward</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label style={label}>Priority</label>
-                    <select value={newComplaint.priority} onChange={(event) => updateNewComplaint('priority', event.target.value)} style={selectInput}>
-                      <option value="critical">Critical</option>
-                      <option value="high">High</option>
-                      <option value="medium">Medium</option>
-                      <option value="low">Low</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label style={label}>Workflow Status</label>
-                    <select value={newComplaint.status} onChange={(event) => updateNewComplaint('status', event.target.value)} style={selectInput}>
-                      <option value="assigned">Assigned</option>
-                      <option value="verification">Verification</option>
-                      <option value="drafting">Drafting</option>
-                      <option value="approval">Approval Queue</option>
-                    </select>
-                  </div>
-                </div>
+              <div style={formGrid}>
+                <Field label="Complainant *"><input value={newComplaint.complainant} onChange={(e) => updateNewComplaint('complainant', e.target.value)} style={input} /></Field>
+                <Field label="Accused Officer *"><input value={newComplaint.accused} onChange={(e) => updateNewComplaint('accused', e.target.value)} style={input} /></Field>
+                <Field label="Designation"><input value={newComplaint.designation} onChange={(e) => updateNewComplaint('designation', e.target.value)} style={input} /></Field>
+                <Field label="Department *"><input value={newComplaint.department} onChange={(e) => updateNewComplaint('department', e.target.value)} style={input} /></Field>
+                <Field label="Location *"><input value={newComplaint.location} onChange={(e) => updateNewComplaint('location', e.target.value)} style={input} /></Field>
+                <Field label="Language">
+                  <select value={newComplaint.language} onChange={(e) => updateNewComplaint('language', e.target.value)} style={input}>
+                    <option value="en">English</option>
+                    <option value="te">Telugu</option>
+                    <option value="bilingual">English + Telugu</option>
+                  </select>
+                </Field>
+                <Field label="Assign DSP">
+                  <select value={newComplaint.dspId} onChange={(e) => updateNewComplaint('dspId', e.target.value)} style={input}>
+                    <option value="">— Select DSP —</option>
+                    {DSP_OPTIONS.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
+                  </select>
+                </Field>
+                <Field label="Bribe Amount (₹)"><input type="number" value={newComplaint.amount} onChange={(e) => updateNewComplaint('amount', e.target.value)} style={input} /></Field>
+                <Field label="Priority">
+                  <select value={newComplaint.priority} onChange={(e) => updateNewComplaint('priority', e.target.value)} style={input}>
+                    <option value="critical">Critical</option>
+                    <option value="high">High</option>
+                    <option value="medium">Medium</option>
+                    <option value="low">Low</option>
+                  </select>
+                </Field>
+                <Field label="Channel">
+                  <select value={newComplaint.channel} onChange={(e) => updateNewComplaint('channel', e.target.value)} style={input}>
+                    <option>Walk-in</option>
+                    <option>Online Portal</option>
+                    <option>Helpline</option>
+                    <option>Vigilance Forward</option>
+                  </select>
+                </Field>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px' }}>
+                  <input type="checkbox" checked={newComplaint.hasEvidence} onChange={(e) => updateNewComplaint('hasEvidence', e.target.checked)} />
+                  Supporting evidence attached
+                </label>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px' }}>
+                  <input type="checkbox" checked={newComplaint.submitToVerification} onChange={(e) => updateNewComplaint('submitToVerification', e.target.checked)} />
+                  Submit to Verification immediately
+                </label>
               </div>
             </div>
-
             <div style={modalFooter}>
-                <button onClick={() => { setCreateOpen(false); setFormError(''); }} style={cancelBtn}>Cancel</button>
-                <button onClick={createComplaint} style={createBtn}>Create Complaint</button>
+              <button onClick={() => setCreateOpen(false)} style={cancelBtn}>Cancel</button>
+              <button onClick={createComplaint} style={createBtn}>Create Complaint</button>
             </div>
           </div>
         </div>
@@ -338,188 +312,43 @@ export default function ComplaintsPage() {
   );
 }
 
-const th = {
-  fontSize: '10.5px',
-  color: 'var(--text-3)',
-  fontWeight: 600,
-  letterSpacing: '0.5px',
-  textTransform: 'uppercase',
-  textAlign: 'left',
-  padding: '12px 14px',
-  borderBottom: '1px solid var(--border)',
-};
-
-const td = {
-  padding: '12px 14px',
-  verticalAlign: 'middle',
-  borderBottom: '1px solid var(--border-2)',
-};
-
-function formatSubmitted(submittedOn) {
-  return new Date(submittedOn).toLocaleString('en-IN', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
+function StatCard({ label, value, color }) {
+  return (
+    <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '12px', padding: '14px 16px', boxShadow: 'var(--shadow)' }}>
+      <div style={{ fontSize: '11px', color: 'var(--text-3)', textTransform: 'uppercase', fontWeight: 600 }}>{label}</div>
+      <div style={{ marginTop: '8px', fontSize: '29px', fontWeight: 700, color: color || 'var(--text)' }}>{value}</div>
+    </div>
+  );
 }
 
-const modalBackdrop = {
-  position: 'fixed',
-  inset: 0,
-  background: 'rgba(15,23,42,0.55)',
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  zIndex: 999,
-  padding: '20px',
-};
+function Field({ label, children }) {
+  return (
+    <div>
+      <label style={labelStyle}>{label}</label>
+      {children}
+    </div>
+  );
+}
 
-const modalCard = {
-  width: 'min(980px, 96vw)',
-  border: '1px solid var(--border)',
-  borderRadius: '14px',
-  background: 'var(--surface)',
-  boxShadow: '0 18px 48px rgba(15,23,42,0.25)',
-  overflow: 'hidden',
-  maxHeight: '88vh',
-  display: 'flex',
-  flexDirection: 'column',
-};
+function formatSubmitted(d) {
+  if (!d) return '—';
+  return new Date(d).toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+}
 
-const modalHead = {
-  borderBottom: '1px solid #1E3447',
-  background: 'linear-gradient(135deg,#0E141F 0%,#182735 100%)',
-  padding: '14px 16px 12px',
-  display: 'flex',
-  justifyContent: 'space-between',
-  alignItems: 'flex-start',
-  gap: '10px',
-};
-
-const closeBtn = {
-  border: '1px solid #35507A',
-  background: '#1D2F4E',
-  color: '#E2E8F0',
-  width: '30px',
-  height: '30px',
-  borderRadius: '8px',
-  fontSize: '14px',
-  fontWeight: 700,
-  lineHeight: 1,
-};
-
-const modalBody = {
-  padding: '14px 16px 16px',
-  display: 'grid',
-  gap: '10px',
-  overflowY: 'auto',
-};
-
-const formSection = {
-  border: '1px solid var(--border)',
-  borderRadius: '12px',
-  background: 'var(--surface-2)',
-  padding: '12px',
-  display: 'grid',
-  gap: '10px',
-};
-
-const sectionTitle = {
-  fontSize: '11px',
-  letterSpacing: '0.6px',
-  textTransform: 'uppercase',
-  fontWeight: 700,
-  color: 'var(--text-3)',
-};
-
-const formGrid = {
-  display: 'grid',
-  gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
-  gap: '12px',
-};
-
-const label = {
-  display: 'block',
-  marginBottom: '6px',
-  fontSize: '11px',
-  letterSpacing: '0.4px',
-  textTransform: 'uppercase',
-  fontWeight: 700,
-  color: 'var(--text-3)',
-};
-
-const input = {
-  width: '100%',
-  border: '1px solid var(--border)',
-  borderRadius: '10px',
-  padding: '10px 11px',
-  fontSize: '12px',
-  color: 'var(--text)',
-  background: 'var(--surface)',
-  minHeight: '40px',
-};
-
-const selectInput = {
-  ...input,
-  appearance: 'none',
-  WebkitAppearance: 'none',
-  MozAppearance: 'none',
-  paddingRight: '36px',
-  backgroundImage: 'linear-gradient(45deg, transparent 50%, #64748B 50%), linear-gradient(135deg, #64748B 50%, transparent 50%)',
-  backgroundPosition: 'calc(100% - 16px) calc(50% - 3px), calc(100% - 11px) calc(50% - 3px)',
-  backgroundSize: '5px 5px, 5px 5px',
-  backgroundRepeat: 'no-repeat',
-};
-
-const filterSelect = {
-  ...selectInput,
-  minWidth: '162px',
-  borderRadius: '10px',
-  fontSize: '13px',
-  backgroundColor: 'var(--surface-2)',
-};
-
-const spanTwoCols = {
-  gridColumn: '1 / -1',
-};
-
-const modalFooter = {
-  borderTop: '1px solid var(--border)',
-  padding: '11px 16px 12px',
-  display: 'flex',
-  justifyContent: 'flex-end',
-  gap: '8px',
-  background: 'var(--surface)',
-};
-
-const cancelBtn = {
-  border: '1px solid var(--border)',
-  background: 'var(--surface-2)',
-  color: 'var(--text-2)',
-  borderRadius: '9px',
-  fontSize: '12px',
-  fontWeight: 700,
-  padding: '8px 12px',
-};
-
-const createBtn = {
-  border: '1px solid #00A84A',
-  background: '#00C853',
-  color: '#052E16',
-  borderRadius: '9px',
-  fontSize: '12px',
-  fontWeight: 700,
-  padding: '8px 12px',
-};
-
-const errorBox = {
-  border: '1px solid #FCA5A5',
-  background: '#FEF2F2',
-  color: '#991B1B',
-  borderRadius: '10px',
-  padding: '8px 10px',
-  fontSize: '12px',
-  fontWeight: 700,
-};
+const th = { fontSize: '10.5px', color: 'var(--text-3)', fontWeight: 600, letterSpacing: '0.5px', textTransform: 'uppercase', textAlign: 'left', padding: '12px 14px', borderBottom: '1px solid var(--border)' };
+const td = { padding: '12px 14px', borderBottom: '1px solid var(--border-2)' };
+const pill = { display: 'inline-flex', marginTop: '6px', fontSize: '11px', fontWeight: 600, borderRadius: '999px', padding: '3px 9px' };
+const input = { width: '100%', border: '1px solid var(--border)', borderRadius: '10px', padding: '10px 11px', fontSize: '12px', background: 'var(--surface)' };
+const filterSelect = { ...input, minWidth: '162px' };
+const actionBtn = { border: '1px solid var(--border)', background: 'var(--surface-2)', fontSize: '12px', fontWeight: 600, borderRadius: '8px', padding: '7px 10px', cursor: 'pointer' };
+const labelStyle = { display: 'block', marginBottom: '6px', fontSize: '11px', fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase' };
+const formGrid = { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '12px' };
+const modalBackdrop = { position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 999, padding: '20px' };
+const modalCard = { width: 'min(980px, 96vw)', border: '1px solid var(--border)', borderRadius: '14px', background: 'var(--surface)', maxHeight: '88vh', display: 'flex', flexDirection: 'column' };
+const modalHead = { borderBottom: '1px solid #1E3447', background: 'linear-gradient(135deg,#0E141F 0%,#182735 100%)', padding: '14px 16px', display: 'flex', justifyContent: 'space-between' };
+const closeBtn = { border: '1px solid #35507A', background: '#1D2F4E', color: '#E2E8F0', width: '30px', height: '30px', borderRadius: '8px' };
+const modalBody = { padding: '14px 16px', overflowY: 'auto' };
+const modalFooter = { borderTop: '1px solid var(--border)', padding: '11px 16px', display: 'flex', justifyContent: 'flex-end', gap: '8px' };
+const cancelBtn = { border: '1px solid var(--border)', background: 'var(--surface-2)', borderRadius: '9px', fontSize: '12px', fontWeight: 700, padding: '8px 12px' };
+const createBtn = { border: '1px solid #00A84A', background: '#00C853', color: '#052E16', borderRadius: '9px', fontSize: '12px', fontWeight: 700, padding: '8px 12px' };
+const errorBox = { border: '1px solid #FCA5A5', background: '#FEF2F2', color: '#991B1B', borderRadius: '10px', padding: '8px 10px', fontSize: '12px', fontWeight: 700 };

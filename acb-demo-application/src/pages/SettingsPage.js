@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { api } from '../utils/api';
 
 const tabs = [
   { id: 'profile', label: 'Profile', icon: '👤' },
@@ -112,13 +113,41 @@ function Toggle({ checked, onChange }) {
 export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState('profile');
   const [saved, setSaved] = useState(false);
+  const [settings, setSettings] = useState(null);
   const [notif, setNotif] = useState(
     Object.fromEntries(notificationItems.map((item) => [item.label, item.defaultChecked]))
   );
 
-  function save() {
-    setSaved(true);
-    setTimeout(() => setSaved(false), 3000);
+  useEffect(() => {
+    api.getSettings().then((s) => {
+      setSettings(s);
+      setNotif({
+        'Case Updates': s.notificationCaseUpdates ?? true,
+        'AI Extraction Complete': s.notificationPipelineComplete ?? true,
+        'Draft Generated': s.notificationDraftGenerated ?? true,
+        'Review Reminders': s.notificationReviewReminders ?? false,
+      });
+    }).catch(() => {});
+  }, []);
+
+  async function save() {
+    try {
+      const patch = {
+        aiProvider: settings?.aiProvider || 'local',
+        languagePreference: settings?.languagePreference || 'en',
+        pipelineNotifyThreshold: settings?.pipelineNotifyThreshold || 100,
+        notificationCaseUpdates: notif['Case Updates'],
+        notificationPipelineComplete: notif['AI Extraction Complete'],
+        notificationDraftGenerated: notif['Draft Generated'],
+        notificationReviewReminders: notif['Review Reminders'],
+      };
+      const updated = await api.patchSettings(patch);
+      setSettings(updated);
+      setSaved(true);
+      setTimeout(() => setSaved(false), 3000);
+    } catch {
+      setSaved(false);
+    }
   }
 
   return (
@@ -250,35 +279,45 @@ export default function SettingsPage() {
             <h3 style={{ margin: 0, fontSize: '15px', color: 'var(--text)' }}>🧠 AI Configuration</h3>
             <div style={{ marginTop: '10px', display: 'grid', gap: '10px' }}>
               <div>
-                <label style={labelStyle}>OpenAI API Key</label>
-                <input type="password" defaultValue="sk-••••••••••••••••••" style={inputStyle} />
-                <div style={{ marginTop: '4px', fontSize: '11px', color: 'var(--text-3)' }}>
-                  Used for AI extraction and draft generation. Leave blank to use mock AI.
-                </div>
-              </div>
-              <div>
-                <label style={labelStyle}>Default Draft Language</label>
-                <select defaultValue="english" style={inputStyle}>
-                  <option value="english">English</option>
-                  <option value="telugu">Telugu</option>
-                  <option value="hindi">Hindi</option>
+                <label style={labelStyle}>AI Provider</label>
+                <select
+                  value={settings?.aiProvider || 'local'}
+                  onChange={(e) => setSettings((s) => ({ ...s, aiProvider: e.target.value }))}
+                  style={inputStyle}
+                >
+                  <option value="local">Local (Ollama / Qwen)</option>
+                  <option value="cloud">Cloud API</option>
                 </select>
               </div>
               <div>
-                <label style={labelStyle}>AI Confidence Threshold</label>
-                <input type="range" min="50" max="100" defaultValue="80" style={{ width: '100%', accentColor: '#16A34A' }} />
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '4px', fontSize: '11px', color: 'var(--text-3)' }}>
-                  <span>50%</span>
-                  <span>80% (current)</span>
-                  <span>100%</span>
-                </div>
+                <label style={labelStyle}>Default Language</label>
+                <select
+                  value={settings?.languagePreference || 'en'}
+                  onChange={(e) => setSettings((s) => ({ ...s, languagePreference: e.target.value }))}
+                  style={inputStyle}
+                >
+                  <option value="en">English</option>
+                  <option value="te">Telugu</option>
+                  <option value="bilingual">English + Telugu</option>
+                </select>
+              </div>
+              <div>
+                <label style={labelStyle}>Pipeline Notify Threshold (%)</label>
+                <input
+                  type="number"
+                  min="50"
+                  max="100"
+                  value={settings?.pipelineNotifyThreshold ?? 100}
+                  onChange={(e) => setSettings((s) => ({ ...s, pipelineNotifyThreshold: Number(e.target.value) }))}
+                  style={inputStyle}
+                />
               </div>
             </div>
 
             <div style={{ marginTop: '12px', border: '1px solid rgba(22,163,74,0.24)', borderRadius: '10px', background: 'rgba(22,163,74,0.08)', padding: '10px' }}>
               <div style={{ fontSize: '12px', color: '#166534', fontWeight: 700 }}>AI Status</div>
               <div style={{ marginTop: '4px', fontSize: '11px', color: '#14532D' }}>
-                AI engine is active. Using mock responses (no API key configured). Add an OpenAI API key to enable real AI extraction.
+                Using {(settings?.aiProvider || 'local') === 'local' ? 'local Ollama/Qwen pipeline' : 'cloud API'} for OCR, extraction, and draft generation.
               </div>
             </div>
 

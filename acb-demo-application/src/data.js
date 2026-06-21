@@ -34,18 +34,14 @@ export const docStatusMeta = (s) => {
 };
 
 export const phaseDefs = (activeId = 'trap') => {
-  const ids = ['complaint', 'verification', 'approval', 'trap', 'remand', 'investigation', 'prosecution'];
-  const activeIdx = ids.includes(activeId) ? ids.indexOf(activeId) : 3;
-  
-  return [
-    { id: 'complaint', label: 'Complaint', status: activeIdx > 0 ? 'completed' : (activeIdx === 0 ? 'inprogress' : 'notstarted') },
-    { id: 'verification', label: 'Verification', status: activeIdx > 1 ? 'completed' : (activeIdx === 1 ? 'inprogress' : 'notstarted') },
-    { id: 'approval', label: 'Approval', status: activeIdx > 2 ? 'completed' : (activeIdx === 2 ? 'inprogress' : 'notstarted') },
-    { id: 'trap', label: 'Trap', status: activeIdx > 3 ? 'completed' : (activeIdx === 3 ? 'inprogress' : 'notstarted') },
-    { id: 'remand', label: 'Remand', status: activeIdx > 4 ? 'completed' : (activeIdx === 4 ? 'inprogress' : 'notstarted') },
-    { id: 'investigation', label: 'Investigation', status: activeIdx > 5 ? 'completed' : (activeIdx === 5 ? 'inprogress' : 'notstarted') },
-    { id: 'prosecution', label: 'Prosecution', status: activeIdx > 6 ? 'completed' : (activeIdx === 6 ? 'inprogress' : 'notstarted') },
-  ];
+  const ids = ['complaint', 'verification', 'approval', 'trap', 'remand', 'investigation', 'evidence', 'court', 'prosecution'];
+  const activeIdx = ids.includes(activeId) ? ids.indexOf(activeId) : ids.indexOf('trap');
+
+  return ids.map((id, i) => ({
+    id,
+    label: id.charAt(0).toUpperCase() + id.slice(1).replace(/_/g, ' '),
+    status: i < activeIdx ? 'completed' : i === activeIdx ? 'inprogress' : 'notstarted',
+  }));
 };
 
 export const caseRec = () => ({
@@ -145,6 +141,26 @@ export const panelData = (id) => {
         { name: 'Witness Statement Summaries', meta: 'WSS-0142', status: 'Pending', doc: null },
         { name: 'Suspension Recommendation', meta: 'SR-0142', status: 'Pending', doc: null },
       ],
+    },
+    evidence: {
+      title: 'Evidence Chain of Custody', desc: 'Digital vault logging uploads, views, and modifications. Links operational files to Qdrant embeddings for semantic search auditing.',
+      checkpoints: [cp('Chain of custody logged', 0), cp('Embeddings linked', 0), cp('Access audit complete', 0)],
+      fields: [
+        { label: 'Evidence Items', value: '5 logged', font: 'inherit' },
+        { label: 'Secured Items', value: '3', font: 'inherit' },
+        { label: 'Last Access', value: 'Insp. D. Prakash Reddy', font: 'inherit' },
+      ],
+      documents: [{ name: 'Evidence Register', meta: 'ER-0142', status: 'Generated', doc: null }],
+    },
+    court: {
+      title: 'Court Proceedings', desc: 'Litigation tracker for hearing dates, bench details, witness summons statuses, and court orders.',
+      checkpoints: [cp('Hearings scheduled', 0), cp('Summons tracked', 0), cp('Orders recorded', 0)],
+      fields: [
+        { label: 'Court', value: 'Prl. Special Judge, SPE & ACB', font: 'inherit' },
+        { label: 'Next Hearing', value: 'Pending', font: "'JetBrains Mono',monospace" },
+        { label: 'Bench', value: '—', font: 'inherit' },
+      ],
+      documents: [{ name: 'Hearing Diary', meta: 'HD-0142', status: 'Draft', doc: null }],
     },
     prosecution: {
       title: 'Prosecution & Charge Sheet', desc: 'Draft Final Report, charge sheet, memo of evidence and sanction order — with evidence-to-charge mapping and witness consistency checks.',

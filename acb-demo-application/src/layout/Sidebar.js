@@ -1,11 +1,25 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-
+import { api } from '../utils/api';
+import { isPhaseNavLocked } from '../utils/workflow';
 import logo from '../assets/acb-emblem.jpeg';
 
 export default function Sidebar() {
   const navigate = useNavigate();
   const location = useLocation();
+  const [complaintCount, setComplaintCount] = useState(null);
+  const [phaseCounts, setPhaseCounts] = useState({});
+
+  useEffect(() => {
+    api.getDashboardKpis()
+      .then((d) => {
+        setComplaintCount(d?.operational?.totalComplaints ?? null);
+        const counts = {};
+        (d?.phaseDistribution || []).forEach((p) => { counts[p.phase] = p.count; });
+        setPhaseCounts(counts);
+      })
+      .catch(() => {});
+  }, [location.pathname]);
 
   const navIcon = (id) => ({
     dashboard: 'M3 3h7v7H3zM14 3h7v7h-7zM14 14h7v7h-7zM3 14h7v7H3z',
@@ -26,12 +40,12 @@ export default function Sidebar() {
 
   const currentPath = location.pathname;
   const pathParts = currentPath.split('/').filter(Boolean);
-  const phaseRoutes = ['complaints', 'verification', 'approval', 'trap', 'remand', 'investigation', 'evidence', 'court', 'prosecution'];
+  const phaseRoutes = ['verification', 'approval', 'trap', 'remand', 'investigation', 'evidence', 'court', 'prosecution'];
   const activePhase = pathParts[0] && phaseRoutes.includes(pathParts[0]) ? pathParts[0] : null;
 
   const workspaceNav = [
     { id: 'dashboard', label: 'Dashboard', path: '/' },
-    { id: 'complaints', label: 'Complaints', path: '/complaints', badge: '37' },
+    { id: 'complaints', label: 'Complaints', path: '/complaints', badge: complaintCount != null ? String(complaintCount) : null },
     { id: 'processor', label: 'Document Processor', path: '/document-processor' },
     { id: 'reports', label: 'Case Reports', path: '/case-reports' },
     { id: 'speech', label: 'Speech Intelligence', path: '/speech-intelligence' },
@@ -39,15 +53,19 @@ export default function Sidebar() {
   ];
 
   const phaseNav = [
-    { id: 'verification', label: 'Verification', route: 'verification', locked: false },
-    { id: 'fir', label: 'FIR / Approval', route: 'approval', locked: false },
-    { id: 'trap', label: 'Trap Operations', route: 'trap', locked: false },
-    { id: 'remand', label: 'Remand', route: 'remand', locked: false },
-    { id: 'investigation', label: 'Investigation', route: 'investigation', locked: false },
-    { id: 'evidence', label: 'Evidence', route: 'evidence', locked: true },
-    { id: 'court', label: 'Court', route: 'court', locked: true },
-    { id: 'prosecution', label: 'Prosecution', route: 'prosecution', locked: false },
-  ];
+    { id: 'verification', label: 'Verification', route: 'verification' },
+    { id: 'fir', label: 'FIR / Approval', route: 'approval' },
+    { id: 'trap', label: 'Trap Operations', route: 'trap' },
+    { id: 'remand', label: 'Remand', route: 'remand' },
+    { id: 'investigation', label: 'Investigation', route: 'investigation' },
+    { id: 'evidence', label: 'Evidence', route: 'evidence' },
+    { id: 'court', label: 'Court', route: 'court' },
+    { id: 'prosecution', label: 'Prosecution', route: 'prosecution' },
+  ].map((item) => ({
+    ...item,
+    locked: isPhaseNavLocked(item.route, phaseCounts),
+    count: phaseCounts[item.route],
+  }));
 
   const systemNav = [
     { id: 'reports', label: 'Reports Generator', path: '/reports' },
@@ -55,100 +73,62 @@ export default function Sidebar() {
   ];
 
   const navItemStyle = (isActive) => ({
-    position: 'relative',
-    width: '100%', display: 'flex', alignItems: 'center', gap: '12px',
+    position: 'relative', width: '100%', display: 'flex', alignItems: 'center', gap: '12px',
     padding: '10px 14px', margin: '2px 0', border: 'none', background: isActive ? 'rgba(255,255,255,0.06)' : 'transparent',
-    color: isActive ? '#fff' : '#8B9BB4', borderRadius: '10px',
-    fontSize: '13.5px', fontWeight: isActive ? 600 : 500, textAlign: 'left',
-    transition: 'background 120ms ease, color 120ms ease',
-    cursor: 'pointer',
-    textDecoration: 'none'
+    color: isActive ? '#fff' : '#8B9BB4', borderRadius: '10px', fontSize: '13.5px', fontWeight: isActive ? 600 : 500,
+    textAlign: 'left', transition: 'background 120ms ease', cursor: 'pointer',
   });
 
   return (
     <aside style={{ width: '280px', flexShrink: 0, background: '#0E141F', display: 'flex', flexDirection: 'column', borderRight: '1px solid #1C2433' }}>
       <div style={{ height: '64px', flexShrink: 0, display: 'flex', alignItems: 'center', gap: '12px', padding: '0 18px', borderBottom: '1px solid #1A2230' }}>
-        <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, overflow: 'hidden', boxShadow: '0 0 0 1px rgba(0,200,83,0.4)' }}>
-          <img src={logo} alt="ACB" style={{ width: '38px', height: '38px', objectFit: 'contain' }} onError={(e) => { e.target.style.display = 'none'; }} />
-          <div style={{ fontSize: '20px', fontWeight: 700, color: '#0E141F', display: 'none' }}>🔎</div>
+        <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: '#fff', overflow: 'hidden' }}>
+          <img src={logo} alt="ACB" style={{ width: '38px', height: '38px', objectFit: 'contain' }} />
         </div>
-        <div style={{ minWidth: 0 }}>
-          <div style={{ fontSize: '13px', fontWeight: 700, color: '#fff', letterSpacing: '0.3px', lineHeight: 1.2 }}>ACB · TELANGANA</div>
-          <div style={{ fontSize: '10.5px', fontWeight: 500, color: '#7C8AA0', letterSpacing: '0.4px', textTransform: 'uppercase', marginTop: '1px' }}>Trap Case Management</div>
+        <div>
+          <div style={{ fontSize: '13px', fontWeight: 700, color: '#fff' }}>ACB · TELANGANA</div>
+          <div style={{ fontSize: '10.5px', color: '#7C8AA0', textTransform: 'uppercase' }}>Trap Case Management</div>
         </div>
       </div>
 
       <nav style={{ flex: 1, overflowY: 'auto', padding: '14px 12px' }}>
-        <div style={{ fontSize: '10px', fontWeight: 600, letterSpacing: '1px', color: '#5A687E', textTransform: 'uppercase', padding: '6px 10px 8px' }}>Workspace</div>
-        {workspaceNav.map((item) => {
-          const isActive = currentPath === item.path;
-          return (
-            <button key={item.id} onClick={() => navigate(item.path)} style={navItemStyle(isActive)}>
-              <span style={{ position: 'absolute', left: 0, top: '8px', bottom: '8px', width: '3px', borderRadius: '0 3px 3px 0', background: '#00C853', opacity: isActive ? 1 : 0 }}></span>
-              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
-                <path d={item.iconPath || navIcon(item.id)}></path>
-              </svg>
-              <span style={{ flex: 1 }}>{item.label}</span>
-              {item.badge && <span style={{ fontSize: '10.5px', fontWeight: 700, fontFamily: "'JetBrains Mono',monospace", background: 'rgba(0,200,83,0.16)', color: '#3DDC84', padding: '1px 7px', borderRadius: '20px' }}>{item.badge}</span>}
-            </button>
-          );
-        })}
-
-        <div style={{ fontSize: '10px', fontWeight: 600, letterSpacing: '1px', color: '#5A687E', textTransform: 'uppercase', padding: '16px 10px 8px' }}>Case Phases</div>
-        {phaseNav.map((item) => {
-          const isActive = activePhase === item.route;
-          return (
-            <button
-              key={item.id}
-              onClick={() => {
-                if (!item.locked) {
-                  navigate(`/${item.route}`);
-                }
-              }}
-              style={{
-                ...navItemStyle(isActive),
-                fontSize: '13px',
-                padding: '8px 11px',
-                opacity: item.locked ? 0.65 : 1,
-                cursor: item.locked ? 'not-allowed' : 'pointer',
-              }}
-            >
-              <span style={{ position: 'absolute', left: 0, top: '7px', bottom: '7px', width: '3px', borderRadius: '0 3px 3px 0', background: '#00C853', opacity: isActive ? 1 : 0 }}></span>
-              <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}><path d={navIcon(item.id)}></path></svg>
-              <span style={{ flex: 1 }}>{item.label}</span>
-              {item.locked ? (
-                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="#94A3B8" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
-                  <path d="M7 11V8a5 5 0 0 1 10 0v3"></path>
-                  <rect x="5" y="11" width="14" height="10" rx="2"></rect>
-                </svg>
-              ) : (
-                <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#94A3B8', flexShrink: 0 }}></span>
-              )}
-            </button>
-          );
-        })}
-
-        <div style={{ fontSize: '10px', fontWeight: 600, letterSpacing: '1px', color: '#5A687E', textTransform: 'uppercase', padding: '16px 10px 8px' }}>System</div>
-        {systemNav.map((item) => {
-          const isActive = currentPath === item.path;
-          return (
-            <button key={item.id} onClick={() => navigate(item.path)} style={navItemStyle(isActive)}>
-              <span style={{ position: 'absolute', left: 0, top: '8px', bottom: '8px', width: '3px', borderRadius: '0 3px 3px 0', background: '#00C853', opacity: isActive ? 1 : 0 }}></span>
-              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}><path d={navIcon(item.id)}></path></svg>
-              <span style={{ flex: 1 }}>{item.label}</span>
-            </button>
-          );
-        })}
+        <NavSection title="Workspace" items={workspaceNav} currentPath={currentPath} navigate={navigate} navIcon={navIcon} navItemStyle={navItemStyle} />
+        <NavSection title="Case Phases" items={phaseNav} currentPath={currentPath} navigate={navigate} navIcon={navIcon} navItemStyle={navItemStyle} isPhase />
+        <NavSection title="System" items={systemNav} currentPath={currentPath} navigate={navigate} navIcon={navIcon} navItemStyle={navItemStyle} />
       </nav>
 
       <div style={{ flexShrink: 0, padding: '12px', borderTop: '1px solid #1A2230', display: 'flex', alignItems: 'center', gap: '11px' }}>
-        <div style={{ width: '36px', height: '36px', borderRadius: '9px', background: 'linear-gradient(135deg,#007A33,#00C853)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 700, fontSize: '13px', flexShrink: 0 }}>PR</div>
-        <div style={{ minWidth: 0, flex: 1 }}>
-          <div style={{ fontSize: '12.5px', fontWeight: 600, color: '#E6EBF2', lineHeight: 1.2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>Insp. D. Prakash Reddy</div>
-          <div style={{ fontSize: '10.5px', color: '#7C8AA0', marginTop: '1px' }}>CIU · Warangal Range</div>
+        <div style={{ width: '36px', height: '36px', borderRadius: '9px', background: 'linear-gradient(135deg,#007A33,#00C853)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 700, fontSize: '13px' }}>PR</div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: '12.5px', fontWeight: 600, color: '#E6EBF2' }}>Insp. D. Prakash Reddy</div>
+          <div style={{ fontSize: '10.5px', color: '#7C8AA0' }}>CIU · Warangal Range · IO</div>
         </div>
-        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#7C8AA0" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M6 9l6 6 6-6"></path></svg>
       </div>
     </aside>
+  );
+}
+
+function NavSection({ title, items, currentPath, navigate, navIcon, navItemStyle, isPhase }) {
+  return (
+    <>
+      <div style={{ fontSize: '10px', fontWeight: 600, letterSpacing: '1px', color: '#5A687E', textTransform: 'uppercase', padding: '6px 10px 8px' }}>{title}</div>
+      {items.map((item) => {
+        const path = item.path || `/${item.route}`;
+        const isActive = isPhase ? currentPath === path : currentPath === item.path;
+        return (
+          <button
+            key={item.id}
+            onClick={() => { if (!item.locked) navigate(path); }}
+            style={{ ...navItemStyle(isActive), opacity: item.locked ? 0.55 : 1, cursor: item.locked ? 'not-allowed' : 'pointer', fontSize: isPhase ? '13px' : undefined }}
+          >
+            <span style={{ position: 'absolute', left: 0, top: '8px', bottom: '8px', width: '3px', borderRadius: '0 3px 3px 0', background: '#00C853', opacity: isActive ? 1 : 0 }} />
+            <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" strokeWidth="1.8"><path d={item.iconPath || navIcon(item.id)} /></svg>
+            <span style={{ flex: 1 }}>{item.label}</span>
+            {item.badge ? <span style={{ fontSize: '10.5px', fontWeight: 700, background: 'rgba(0,200,83,0.16)', color: '#3DDC84', padding: '1px 7px', borderRadius: '20px' }}>{item.badge}</span> : null}
+            {item.locked ? <span style={{ fontSize: '10px', color: '#94A3B8' }}>🔒</span> : item.count ? <span style={{ fontSize: '10px', color: '#94A3B8' }}>{item.count}</span> : null}
+          </button>
+        );
+      })}
+    </>
   );
 }
