@@ -229,13 +229,7 @@ export const caseRightRailData = {
     { label: 'IO', value: 'Insp. D. Prakash Reddy', font: 'inherit' },
     { label: 'Supervising DSP', value: 'G. Anil Kumar', font: 'inherit' },
   ],
-  evidence: [
-    { type: 'Audio', name: 'Pre-trap conversation (TE)', id: 'EV-0142-A1', meta: '14:22', status: 'Verified', statusColor: '#0F7A3D', icon: 'M9 18V5l12-2v13M9 18a3 3 0 1 1-6 0 3 3 0 0 1 6 0zM21 16a3 3 0 1 1-6 0 3 3 0 0 1 6 0z', bg: 'rgba(37,99,235,0.12)', color: '#2563EB' },
-    { type: 'Video', name: 'Trap execution CCTV', id: 'EV-0142-V1', meta: '02:08', status: 'Verified', statusColor: '#0F7A3D', icon: 'M23 7l-7 5 7 5zM1 5h15v14H1z', bg: 'rgba(124,58,237,0.13)', color: '#7C3AED' },
-    { type: 'Currency', name: 'Tainted notes ₹50,000', id: 'EV-0142-C1', meta: '100 × ₹500', status: 'Seized', statusColor: '#B45309', icon: 'M2 7h20v10H2zM12 12a2 2 0 1 1-4 0 2 2 0 0 1 4 0zM6 7v10M18 7v10', bg: 'rgba(0,200,83,0.13)', color: '#0F7A3D' },
-    { type: 'Document', name: 'Bribe-related official file', id: 'EV-0142-D1', meta: '12 pp.', status: 'Seized', statusColor: '#B45309', icon: 'M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8zM14 2v6h6', bg: 'var(--surface-3,#EEF2F6)', color: 'var(--text-2,#374151)' },
-    { type: 'Apparel', name: "AO's shirt (test +ve)", id: 'EV-0142-AP1', meta: 'chemical', status: 'Seized', statusColor: '#B45309', icon: 'M20.4 14.5L16 10 4 22M6 4l4 4 4-4M6 4l-4 4 4 4M18 4l4 4-4 4', bg: 'rgba(217,119,6,0.14)', color: '#B45309' },
-  ],
+  evidence: [],
   audit: [
     { act: 'Generated Mediators Report-II', who: 'Insp. D. Prakash Reddy', time: '14 May, 19:42' },
     { act: 'Approved post-trap proceedings', who: 'DSP G. Anil Kumar', time: '14 May, 21:10' },

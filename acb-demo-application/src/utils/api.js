@@ -60,6 +60,8 @@ export const api = {
   getPhaseReportMeta: () => request('/report-templates/phases'),
   getProcessingFlow: () => request('/workflow/processing-flow'),
   getCaseComplaints: (caseId) => request(`/complaints/by-case/${encodeURIComponent(caseId)}`),
+  getCaseEvidence: (caseId) => request(`/cases/${encodeURIComponent(caseId)}/evidence`),
+  getMediaRecords: (caseId) => request(`/media-records?case_id=${encodeURIComponent(caseId)}`),
   addFurtherComplaint: (caseId, body) =>
     request(`/complaints/by-case/${encodeURIComponent(caseId)}/further`, { method: 'POST', body: JSON.stringify(body) }),
 };

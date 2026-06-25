@@ -3,20 +3,20 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8000';
 
 const PIPELINE_STAGES = [
-  { key: 'converting_pdf', label: 'Converting PDF to Images', description: '300 DPI page rendering' },
-  { key: 'running_ocr', label: 'OCR Text Extraction', description: 'PaddleOCR per page' },
-  { key: 'reconstructing_pages', label: 'Reading Order Reconstruction', description: 'Sort blocks by position' },
-  { key: 'detecting_subdocuments', label: 'AI Sub-document Detection', description: 'Identify boundaries and document types' },
-  { key: 'extracting_content', label: 'AI Content Extraction', description: 'Extract people, dates, findings' },
-  { key: 'storing_results', label: 'Storing Results', description: 'Saving to database' },
-  { key: 'generating_embeddings', label: 'Generating Embeddings', description: 'Vector indexing for search' },
+  { key: 'converting_pdf', label: 'Converting PDF', description: 'Rendering pages' },
+  { key: 'running_ocr', label: 'Extracting Text', description: 'Reading page content' },
+  { key: 'reconstructing_pages', label: 'Organizing Layout', description: 'Sorting document elements' },
+  { key: 'detecting_subdocuments', label: 'Detecting Documents', description: 'Finding document boundaries' },
+  { key: 'extracting_content', label: 'Identifying Names & Dates', description: 'Extracting key information' },
+  { key: 'storing_results', label: 'Saving Evidence', description: 'Storing to database' },
+  { key: 'generating_embeddings', label: 'Indexing Results', description: 'Making searchable' },
 ];
 
 const stageStatusColor = {
-  pending: { bg: 'var(--surface-2)', text: 'var(--text-3)', border: 'var(--border-2)', dot: '#9AA8BA' },
-  active: { bg: 'rgba(29,78,216,0.08)', text: '#1D4ED8', border: 'rgba(29,78,216,0.28)', dot: '#2563EB' },
-  completed: { bg: 'rgba(22,163,74,0.08)', text: '#166534', border: 'rgba(22,163,74,0.28)', dot: '#22C55E' },
-  failed: { bg: 'rgba(220,38,38,0.08)', text: '#991B1B', border: 'rgba(220,38,38,0.28)', dot: '#EF4444' },
+  pending: { bg: 'var(--surface-2)', text: 'var(--text-3)', border: 'var(--border-2)', dot: '#9AA8BA', icon: '○' },
+  active: { bg: 'rgba(29,78,216,0.08)', text: '#1D4ED8', border: 'rgba(29,78,216,0.28)', dot: '#2563EB', icon: '⟳' },
+  completed: { bg: 'rgba(22,163,74,0.08)', text: '#166534', border: 'rgba(22,163,74,0.28)', dot: '#22C55E', icon: '✓' },
+  failed: { bg: 'rgba(220,38,38,0.08)', text: '#991B1B', border: 'rgba(220,38,38,0.28)', dot: '#EF4444', icon: '⚠' },
 };
 
 function normalizeCases(data) {
@@ -305,9 +305,12 @@ export default function DocumentProcessorPage() {
   return (
     <div style={{ maxWidth: '1400px', margin: '0 auto', display: 'grid', gap: '14px' }}>
       <div style={hero}>
-        <h2 style={{ margin: 0, fontSize: '22px', color: '#FFFFFF', letterSpacing: '0.2px' }}>AI Document Processor</h2>
-        <p style={{ margin: '8px 0 0', fontSize: '13px', color: '#CBD9E8' }}>
-          Upload a merged PDF. AI detects embedded sub-documents (letters, reports, statements, orders) and extracts structured content from each.
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <span style={{ fontSize: '18px' }}>📄</span>
+          <h2 style={{ margin: 0, fontSize: '16px', color: '#FFFFFF', letterSpacing: '0.2px', fontWeight: 700 }}>AI Document Processor</h2>
+        </div>
+        <p style={{ margin: '6px 0 0', fontSize: '12px', color: '#CBD9E8' }}>
+          Process merged case PDFs and extract evidence.
         </p>
       </div>
 
@@ -317,12 +320,11 @@ export default function DocumentProcessorPage() {
         </div>
       )}
 
-      <div style={{ display: 'grid', gap: '14px', gridTemplateColumns: 'minmax(340px,1fr) minmax(420px,1.35fr)' }}>
+      <div style={{ display: 'grid', gap: '14px', gridTemplateColumns: 'minmax(320px,0.7fr) minmax(420px,1fr)' }}>
         <div style={{ display: 'grid', gap: '14px', alignContent: 'start' }}>
           <div style={card}>
-            <h3 style={h3}>Case Selection</h3>
+            <h3 style={{ ...h3, marginBottom: '8px' }}>Case Selection</h3>
             <div style={selectField}>
-              <label style={label}>Select Case</label>
               <div ref={caseMenuRef} style={dropdownWrap}>
                 <button
                   type="button"
@@ -367,15 +369,22 @@ export default function DocumentProcessorPage() {
                   </div>
                 )}
               </div>
-              <div style={selectHint}>Choose the case to load uploaded files and start extraction.</div>
             </div>
           </div>
 
           {selectedCase && (
             <div style={card}>
-              <h3 style={h3}>Document Stage</h3>
+              <h3 style={{ ...h3, marginBottom: '8px' }}>Case Information</h3>
+              <div style={{ display: 'grid', gap: '6px', fontSize: '12px' }}>
+                <div><span style={{ color: 'var(--text-3)' }}>Case ID</span><br/><strong>{selectedCaseItem?.id || '—'}</strong></div>
+              </div>
+            </div>
+          )}
+
+          {selectedCase && (
+            <div style={card}>
+              <h3 style={{ ...h3, marginBottom: '8px' }}>Document Stage</h3>
               <div style={selectField}>
-                <label style={label}>Select Case Phase/Stage</label>
                 <div ref={phaseMenuRef} style={dropdownWrap}>
                   <button
                     type="button"
@@ -417,7 +426,6 @@ export default function DocumentProcessorPage() {
                     </div>
                   )}
                 </div>
-                <div style={selectHint}>Select where this document belongs in the case workflow.</div>
               </div>
             </div>
           )}
@@ -466,8 +474,8 @@ export default function DocumentProcessorPage() {
           )}
 
           {selectedCase && (
-            <div style={card}>
-              <h3 style={h3}>Upload Document</h3>
+            <div style={{ ...card, borderColor: 'rgba(37,99,235,0.24)', background: 'rgba(37,99,235,0.02)' }}>
+              <h3 style={{ ...h3, marginBottom: '10px', color: '#1D4ED8' }}>📁 Upload Document</h3>
               {!file ? (
                 <button
                   style={{ ...dropzone, borderColor: dragging ? '#1D4ED8' : 'var(--border)' }}
@@ -508,19 +516,33 @@ export default function DocumentProcessorPage() {
         <div style={card}>
           {uiStage === 'idle' && (
             <div style={{ display: 'grid', gap: '10px' }}>
-              <h3 style={{ ...h3, marginBottom: 0 }}>Pipeline Preview</h3>
-              <div style={muted}>{selectedCase ? 'Upload a PDF and click Extract Data to begin.' : 'Select a case to get started.'}</div>
-              <div style={{ display: 'grid', gap: '8px' }}>
-                {PIPELINE_STAGES.map((stage, index) => (
-                  <div key={stage.key} style={stageRow('pending')}>
-                    <span style={indexBadge}>{index + 1}</span>
-                    <div style={{ display: 'grid', gap: '2px' }}>
-                      <div style={{ fontSize: '12px', fontWeight: 700 }}>{stage.label}</div>
-                      <div style={{ fontSize: '11px', color: 'var(--text-3)' }}>{stage.description}</div>
-                    </div>
-                  </div>
-                ))}
+              <h3 style={{ ...h3, marginBottom: 0 }}>Processing Pipeline</h3>
+              <div style={muted}>
+                {selectedCase ? (
+                  <>Upload a PDF to see the processing steps.</>
+                ) : (
+                  <>
+                    <div style={{ fontWeight: 700, marginBottom: '6px' }}>Getting Started</div>
+                    <ol style={{ margin: '0', paddingLeft: '18px', lineHeight: 1.6 }}>
+                      <li>Select a case</li>
+                      <li>Upload merged PDF</li>
+                      <li>Start AI Processing</li>
+                    </ol>
+                  </>
+                )}
               </div>
+              {selectedCase && (
+                <div style={{ display: 'grid', gap: '8px' }}>
+                  {PIPELINE_STAGES.map((stage) => (
+                    <div key={stage.key} style={stageRow('pending')}>
+                      <span style={{ fontSize: '14px', width: '20px', textAlign: 'center' }}>○</span>
+                      <div style={{ display: 'grid', gap: '2px', flex: 1 }}>
+                        <div style={{ fontSize: '12px', fontWeight: 700 }}>{stage.label}</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
 
@@ -545,27 +567,32 @@ export default function DocumentProcessorPage() {
           )}
 
           {uiStage === 'processing' && (
-            <div style={{ display: 'grid', gap: '8px' }}>
-              <h3 style={h3}>Pipeline Running</h3>
+            <div style={{ display: 'grid', gap: '10px' }}>
+              <h3 style={h3}>Processing in Progress</h3>
               <div style={muted}>
-                Document ID: {documentId || '--'} {totalPages ? `· ${totalPages} pages` : ''}
+                {totalPages ? `${totalPages} pages` : 'Processing'}
               </div>
-              <div style={{ display: 'grid', gap: '8px' }}>
-                {PIPELINE_STAGES.map((stage, index) => {
+
+              {/* Overall Progress */}
+              <div>
+                <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-2)', marginBottom: '6px' }}>
+                  {PIPELINE_STAGES.filter((s) => getStageStatus(s.key) === 'completed').length}/{PIPELINE_STAGES.length} Steps
+                </div>
+                <div style={{ height: '8px', borderRadius: '999px', background: 'var(--surface-3)', overflow: 'hidden' }}>
+                  <div style={{ width: `${(PIPELINE_STAGES.filter((s) => getStageStatus(s.key) === 'completed').length / PIPELINE_STAGES.length) * 100}%`, height: '100%', background: 'linear-gradient(90deg,#1D4ED8,#0E7490)', transition: 'width 0.3s ease' }} />
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gap: '6px' }}>
+                {PIPELINE_STAGES.map((stage) => {
                   const status = getStageStatus(stage.key);
-                  const progress = stageProgress?.[stage.key];
+                  const icon = stageStatusColor[status].icon;
                   return (
                     <div key={stage.key} style={stageRow(status)}>
-                      <span style={{ ...indexBadge, background: stageStatusColor[status].dot }}>{index + 1}</span>
+                      <span style={{ fontSize: '14px', width: '20px', textAlign: 'center', fontWeight: 700 }}>{icon}</span>
                       <div style={{ display: 'grid', gap: '2px', flex: 1 }}>
                         <div style={{ fontSize: '12px', fontWeight: 700 }}>{stage.label}</div>
-                        <div style={{ fontSize: '11px' }}>{stage.description}</div>
                       </div>
-                      {progress?.total ? (
-                        <div style={progressTag(status)}>
-                          {progress.current}/{progress.total} {progress.unit}
-                        </div>
-                      ) : null}
                     </div>
                   );
                 })}
@@ -588,9 +615,9 @@ export default function DocumentProcessorPage() {
 
           {uiStage === 'done' && (
             <div style={{ display: 'grid', gap: '10px' }}>
-              <h3 style={h3}>Extraction Complete</h3>
+              <h3 style={h3}>✓ Extraction Complete</h3>
               <div style={muted}>
-                {subdocs.length} sub-document{subdocs.length !== 1 ? 's' : ''} · {totalPages} pages · Case {selectedCase}
+                {subdocs.length} documents found · {totalPages} pages processed
               </div>
               <div style={{ display: 'grid', gap: '8px', maxHeight: '560px', overflow: 'auto' }}>
                 {subdocs.map((item, index) => (
@@ -618,7 +645,7 @@ const hero = {
   border: '1px solid #1C2A40',
   borderRadius: '14px',
   boxShadow: 'var(--shadow)',
-  padding: '20px 22px',
+  padding: '12px 16px',
 };
 
 const card = {

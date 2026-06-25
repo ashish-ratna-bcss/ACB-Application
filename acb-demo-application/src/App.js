@@ -1,4 +1,4 @@
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import Layout from './layout/Layout';
 import {
   DashboardPage,
@@ -16,14 +16,23 @@ import {
   InvestigationPage,
   EvidencePage,
   CourtPage,
-  ProsecutionPage
+  ProsecutionPage,
+  LoginPage
 } from './pages';
+
+function RequireAuth({ children }) {
+  if (!sessionStorage.getItem('acb_auth')) {
+    return <Navigate to="/login" replace />;
+  }
+  return children;
+}
 
 function App() {
   return (
     <Router>
       <Routes>
-        <Route element={<Layout />}>
+        <Route path="/login" element={<LoginPage />} />
+        <Route element={<RequireAuth><Layout /></RequireAuth>}>
           <Route index element={<DashboardPage />} />
           <Route path="/" element={<DashboardPage />} />
           <Route path="/document-processor" element={<DocumentProcessorPage />} />

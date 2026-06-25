@@ -1,4 +1,5 @@
 export { default as AdministrationPage } from './AdministrationPage';
+export { default as LoginPage } from './LoginPage';
 export { default as ApprovalPage } from './ApprovalPage';
 export { default as CaseReportsPage } from './CaseReportsPage';
 export { default as ComplaintsPage } from './ComplaintsPage';

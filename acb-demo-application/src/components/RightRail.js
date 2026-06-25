@@ -17,26 +17,28 @@ export default function RightRail({ metadata, evidence, audit }) {
       </div>
 
       {/* EVIDENCE INVENTORY */}
-      <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '12px', boxShadow: 'var(--shadow)', overflow: 'hidden' }}>
-        <div style={{ padding: '14px 18px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text)' }}>Evidence Inventory</span>
-          <span style={{ fontSize: '11px', fontWeight: 600, fontFamily: "'JetBrains Mono',monospace", color: 'var(--text-3)' }}>{evidence.length} items</span>
-        </div>
-        <div style={{ padding: '6px 18px 12px' }}>
-          {evidence.map((ev, i) => (
-            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '11px', padding: '10px 0', borderBottom: '1px solid var(--border-2)' }}>
-              <span style={{ width: '32px', height: '32px', borderRadius: '8px', background: ev.bg, color: ev.color, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d={ev.icon}></path></svg>
-              </span>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: '12.5px', fontWeight: 600, color: 'var(--text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{ev.name}</div>
-                <div style={{ fontSize: '10.5px', color: 'var(--text-3)', fontFamily: "'JetBrains Mono',monospace", marginTop: '1px' }}>{ev.id} · {ev.meta}</div>
+      {evidence && evidence.length > 0 && (
+        <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '12px', boxShadow: 'var(--shadow)', overflow: 'hidden' }}>
+          <div style={{ padding: '14px 18px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text)' }}>Evidence Inventory</span>
+            <span style={{ fontSize: '11px', fontWeight: 600, fontFamily: "'JetBrains Mono',monospace", color: 'var(--text-3)' }}>{evidence.length} items</span>
+          </div>
+          <div style={{ padding: '6px 18px 12px' }}>
+            {evidence.map((ev, i) => (
+              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '11px', padding: '10px 0', borderBottom: '1px solid var(--border-2)' }}>
+                <span style={{ width: '32px', height: '32px', borderRadius: '8px', background: ev.bg, color: ev.color, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d={ev.icon}></path></svg>
+                </span>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: '12.5px', fontWeight: 600, color: 'var(--text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{ev.name}</div>
+                  <div style={{ fontSize: '10.5px', color: 'var(--text-3)', fontFamily: "'JetBrains Mono',monospace", marginTop: '1px' }}>{ev.id} · {ev.meta}</div>
+                </div>
+                <span style={{ fontSize: '10px', fontWeight: 600, color: ev.statusColor }}>{ev.status}</span>
               </div>
-              <span style={{ fontSize: '10px', fontWeight: 600, color: ev.statusColor }}>{ev.status}</span>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* AUDIT TRAIL */}
       <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '12px', boxShadow: 'var(--shadow)', overflow: 'hidden' }}>

@@ -51,6 +51,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.database import SessionLocal, init_db
 from app.log_handler import register_handler
 from app.routers import pdf, stt
+from app.routers import speech_intel as speech_intel_router
+from app.routers import evidence as evidence_router
 from app.routers import cases as cases_router
 from app.routers import media_records as media_records_router
 from app.routers import complaints as complaints_router
@@ -216,8 +218,9 @@ async def lifespan(_: FastAPI):
     register_handler()
     init_db()
     _seed_report_templates()
-    _seed_cases()
-    _seed_workflow_cases()
+    # Demo case seeders disabled — app runs on real data only.
+    # _seed_cases()
+    # _seed_workflow_cases()
     yield
 
 
@@ -247,6 +250,8 @@ app.include_router(report_templates_router.router)
 app.include_router(media_records_router.router)
 app.include_router(pdf.router)
 app.include_router(stt.router)
+app.include_router(speech_intel_router.router)
+app.include_router(evidence_router.router)
 
 
 @app.get("/", tags=["Health"])

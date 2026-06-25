@@ -106,6 +106,16 @@ def create_media_record(payload: MediaRecordCreate):
             processing_time=payload.processing_time,
         )
         db.add(record)
+
+        # Log the uploaded media as a chain-of-custody evidence item for the case.
+        from app.routers.evidence import create_media_evidence
+        create_media_evidence(
+            db,
+            case_id=payload.case_id,
+            file_name=payload.file_name,
+            description=payload.audio_description or (payload.text[:160] if payload.text else None),
+        )
+
         db.commit()
         db.refresh(record)
         return _to_response(record)

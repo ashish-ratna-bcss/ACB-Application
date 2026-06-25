@@ -1,8 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { api } from '../utils/api';
 import { isPhaseNavLocked } from '../utils/workflow';
-import logo from '../assets/acb-emblem.jpeg';
 
 export default function Sidebar() {
   const navigate = useNavigate();
@@ -20,6 +19,14 @@ export default function Sidebar() {
       })
       .catch(() => {});
   }, [location.pathname]);
+
+  useEffect(() => {
+    const onClickOutside = (event) => {
+      if (!profileRef.current?.contains(event.target)) setProfileOpen(false);
+    };
+    document.addEventListener('mousedown', onClickOutside);
+    return () => document.removeEventListener('mousedown', onClickOutside);
+  }, []);
 
   const navIcon = (id) => ({
     dashboard: 'M3 3h7v7H3zM14 3h7v7h-7zM14 14h7v7h-7zM3 14h7v7H3z',
@@ -43,9 +50,11 @@ export default function Sidebar() {
   const phaseRoutes = ['verification', 'approval', 'trap', 'remand', 'investigation', 'evidence', 'court', 'prosecution'];
   const activePhase = pathParts[0] && phaseRoutes.includes(pathParts[0]) ? pathParts[0] : null;
 
+  const [profileOpen, setProfileOpen] = useState(false);
+  const profileRef = useRef(null);
+
   const generalNav = [
     { id: 'dashboard', label: 'Dashboard', path: '/' },
-    { id: 'settings', label: 'Settings', path: '/settings', iconPath: 'M19 11.5A8.5 8.5 0 0 0 11.5 3H7a5 5 0 0 0-5 5v6a5 5 0 0 0 5 5h4.5a8.5 8.5 0 0 0 7.5-8.5M12 8v4m0 4v-4' },
   ];
 
   const workspaceNav = [
@@ -85,8 +94,8 @@ export default function Sidebar() {
   return (
     <aside style={{ width: '280px', flexShrink: 0, background: '#0E141F', display: 'flex', flexDirection: 'column', borderRight: '1px solid #1C2433' }}>
       <div style={{ height: '64px', flexShrink: 0, display: 'flex', alignItems: 'center', gap: '12px', padding: '0 18px', borderBottom: '1px solid #1A2230' }}>
-        <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: '#fff', overflow: 'hidden' }}>
-          <img src={logo} alt="ACB" style={{ width: '38px', height: '38px', objectFit: 'contain' }} />
+        <div style={{ width: '40px', height: '40px' }}>
+          <img src="/acb-logo.png" alt="ACB" style={{ width: '40px', height: '40px', objectFit: 'contain' }} />
         </div>
         <div>
           <div style={{ fontSize: '13px', fontWeight: 700, color: '#fff' }}>ACB · TELANGANA</div>
@@ -101,12 +110,30 @@ export default function Sidebar() {
         <NavSection title="System" items={systemNav} currentPath={currentPath} navigate={navigate} navIcon={navIcon} navItemStyle={navItemStyle} />
       </nav>
 
-      <div style={{ flexShrink: 0, padding: '12px', borderTop: '1px solid #1A2230', display: 'flex', alignItems: 'center', gap: '11px' }}>
-        <div style={{ width: '36px', height: '36px', borderRadius: '9px', background: 'linear-gradient(135deg,#007A33,#00C853)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 700, fontSize: '13px' }}>PR</div>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: '12.5px', fontWeight: 600, color: '#E6EBF2' }}>Insp. D. Prakash Reddy</div>
-          <div style={{ fontSize: '10.5px', color: '#7C8AA0' }}>CIU · Warangal Range · IO</div>
-        </div>
+      <div ref={profileRef} style={{ flexShrink: 0, padding: '12px', borderTop: '1px solid #1A2230', position: 'relative' }}>
+        <button onClick={() => setProfileOpen(!profileOpen)} style={{ width: '100%', border: 'none', background: 'transparent', display: 'flex', alignItems: 'center', gap: '11px', cursor: 'pointer', padding: 0 }}>
+          <div style={{ width: '36px', height: '36px', borderRadius: '9px', background: 'linear-gradient(135deg,#007A33,#00C853)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 700, fontSize: '13px', flexShrink: 0 }}>PR</div>
+          <div style={{ flex: 1, minWidth: 0, textAlign: 'left' }}>
+            <div style={{ fontSize: '12.5px', fontWeight: 600, color: '#E6EBF2' }}>Insp. D. Prakash Reddy</div>
+            <div style={{ fontSize: '10.5px', color: '#7C8AA0' }}>CIU · Warangal Range · IO</div>
+          </div>
+        </button>
+
+        {profileOpen && (
+          <div style={{ position: 'absolute', bottom: 'calc(100% + 8px)', left: '12px', right: '12px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '12px', boxShadow: 'var(--shadow)', zIndex: 50, overflow: 'hidden' }}>
+            <div style={{ padding: '12px', borderBottom: '1px solid var(--border)' }}>
+              <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text)', marginBottom: '2px' }}>Insp. D. Prakash Reddy</div>
+              <div style={{ fontSize: '11px', color: 'var(--text-3)' }}>CIU · Warangal Range</div>
+              <div style={{ fontSize: '11px', color: 'var(--text-3)', marginTop: '2px' }}>Investigation Officer</div>
+            </div>
+            <button onClick={() => { navigate('/settings'); setProfileOpen(false); }} style={{ width: '100%', border: 'none', background: 'transparent', padding: '10px 12px', textAlign: 'left', fontSize: '12px', fontWeight: 600, color: 'var(--text-2)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              ⚙️ Settings
+            </button>
+            <button onClick={() => { sessionStorage.removeItem('acb_auth'); navigate('/login'); setProfileOpen(false); }} style={{ width: '100%', border: 'none', background: 'transparent', padding: '10px 12px', textAlign: 'left', fontSize: '12px', fontWeight: 600, color: '#EF4444', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', borderTop: '1px solid var(--border)' }}>
+              ↪️ Logout
+            </button>
+          </div>
+        )}
       </div>
     </aside>
   );
