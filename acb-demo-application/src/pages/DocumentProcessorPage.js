@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import DocumentViewerModal from '../components/DocumentViewerModal';
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8000';
 
@@ -65,10 +66,15 @@ export default function DocumentProcessorPage() {
   const [currentStage, setCurrentStage] = useState(null);
   const [totalPages, setTotalPages] = useState(0);
   const [subdocs, setSubdocs] = useState([]);
+  const [pagesData, setPagesData] = useState([]);
+  const [savingToCase, setSavingToCase] = useState(false);
+  const [saveSuccess, setSaveSuccess] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
   const [logs, setLogs] = useState([]);
   const [stageProgress, setStageProgress] = useState({});
   const [apiMsg, setApiMsg] = useState('');
+  const [viewerOpen, setViewerOpen] = useState(false);
+  const [selectedDocument, setSelectedDocument] = useState(null);
 
   const fileInputRef = useRef(null);
   const xhrRef = useRef(null);
@@ -90,7 +96,7 @@ export default function DocumentProcessorPage() {
     let cancelled = false;
     const loadCases = async () => {
       try {
-        const primary = await fetch(`${BACKEND_URL}/cases`);
+        const primary = await fetch(`${BACKEND_URL}/api/cases`);
         const primaryData = await primary.json();
         const normalizedPrimary = normalizeCases(primaryData);
         if (normalizedPrimary.length && !cancelled) {
@@ -101,7 +107,7 @@ export default function DocumentProcessorPage() {
       } catch (_) {}
 
       try {
-        const fallback = await fetch(`${BACKEND_URL}/pdf/cases`);
+        const fallback = await fetch(`${BACKEND_URL}/api/pdf/cases`);
         const fallbackData = await fallback.json();
         const normalizedFallback = normalizeCases(fallbackData);
         if (!cancelled) {
@@ -123,7 +129,7 @@ export default function DocumentProcessorPage() {
     setDocsLoading(true);
     setExistingDocs([]);
     try {
-      const res = await fetch(`${BACKEND_URL}/pdf/case/${encodeURIComponent(caseId)}`);
+      const res = await fetch(`${BACKEND_URL}/api/pdf/case/${encodeURIComponent(caseId)}`);
       const data = await res.json();
       setExistingDocs(Array.isArray(data?.documents) ? data.documents : []);
     } catch (_) {
@@ -170,8 +176,8 @@ export default function DocumentProcessorPage() {
       pollRef.current = setInterval(async () => {
         try {
           const [statusRes, logsRes] = await Promise.all([
-            fetch(`${BACKEND_URL}/pdf/status/${docId}`),
-            fetch(`${BACKEND_URL}/pdf/logs/${docId}`),
+            fetch(`${BACKEND_URL}/api/pdf/status/${docId}`),
+            fetch(`${BACKEND_URL}/api/pdf/logs/${docId}`),
           ]);
           const statusData = await statusRes.json();
           const logsData = await logsRes.json();
@@ -182,9 +188,14 @@ export default function DocumentProcessorPage() {
 
           if (statusData.status === 'completed') {
             stopPolling();
-            const sdRes = await fetch(`${BACKEND_URL}/pdf/subdocuments/${docId}`);
+            const [sdRes, pRes] = await Promise.all([
+              fetch(`${BACKEND_URL}/api/pdf/subdocuments/${docId}`),
+              fetch(`${BACKEND_URL}/api/pdf/pages/${docId}`)
+            ]);
             const sdData = await sdRes.json();
+            const pData = await pRes.json();
             setSubdocs(Array.isArray(sdData.subdocuments) ? sdData.subdocuments : []);
+            setPagesData(Array.isArray(pData.pages) ? pData.pages : []);
             setUiStage('done');
             fetchCaseDocs(selectedCase);
           } else if (statusData.status === 'failed') {
@@ -198,6 +209,32 @@ export default function DocumentProcessorPage() {
     [fetchCaseDocs, selectedCase, stopPolling]
   );
 
+  const handlePageTextChange = (idx, text) => {
+    const updated = [...pagesData];
+    updated[idx].page_text = text;
+    setPagesData(updated);
+  };
+
+  const handleSaveToCase = async () => {
+    if (!documentId) return;
+    setSavingToCase(true);
+    setSaveSuccess('');
+    setErrorMsg('');
+    try {
+      const res = await fetch(`${BACKEND_URL}/api/pdf/save-to-case/${documentId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pages: pagesData })
+      });
+      if (!res.ok) throw new Error('Failed to save to case');
+      setSaveSuccess('Successfully saved to case evidence!');
+    } catch (e) {
+      setErrorMsg(e.message);
+    } finally {
+      setSavingToCase(false);
+    }
+  };
+
   const reset = useCallback(() => {
     xhrRef.current?.abort();
     stopPolling();
@@ -208,6 +245,9 @@ export default function DocumentProcessorPage() {
     setCurrentStage(null);
     setTotalPages(0);
     setSubdocs([]);
+    setPagesData([]);
+    setSavingToCase(false);
+    setSaveSuccess('');
     setErrorMsg('');
     setLogs([]);
     setStageProgress({});
@@ -246,7 +286,7 @@ export default function DocumentProcessorPage() {
         };
         xhr.onerror = () => reject(new Error('Network error during upload'));
         xhr.onabort = () => reject(new Error('Upload cancelled'));
-        xhr.open('POST', `${BACKEND_URL}/pdf/upload`);
+        xhr.open('POST', `${BACKEND_URL}/api/pdf/upload`);
         xhr.send(formData);
       }),
     [selectedCase, selectedPhase]
@@ -303,7 +343,15 @@ export default function DocumentProcessorPage() {
   };
 
   return (
-    <div style={{ maxWidth: '1400px', margin: '0 auto', display: 'grid', gap: '14px' }}>
+    <>
+      <DocumentViewerModal
+        isOpen={viewerOpen}
+        onClose={() => setViewerOpen(false)}
+        document={selectedDocument}
+        caseId={selectedCase}
+        CASE_PHASES={CASE_PHASES}
+      />
+      <div style={{ maxWidth: '1400px', margin: '0 auto', display: 'grid', gap: '14px' }}>
       <div style={hero}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
           <span style={{ fontSize: '18px' }}>📄</span>
@@ -442,28 +490,33 @@ export default function DocumentProcessorPage() {
                   {selectedCaseDocs.map((doc) => {
                     const phaseLabel = doc.phase ? CASE_PHASES.find((p) => p.key === doc.phase)?.label || doc.phase : 'No phase';
                     return (
-                    <div key={doc.document_id} style={{ ...docRow, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
-                      <div style={{ minWidth: 0 }}>
+                    <div key={doc.document_id} style={{ ...docRow, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', cursor: 'pointer', transition: 'all 0.2s' }} onClick={() => { setSelectedDocument(doc); setViewerOpen(true); }}>
+                      <div style={{ minWidth: 0, flex: 1 }}>
                         <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                           {doc.original_name || doc.file_name}
                         </div>
-                        <div style={{ fontSize: '11px', color: 'var(--text-3)' }}>
-                          {doc.status} {doc.total_pages > 0 ? `· ${doc.total_pages} pages` : ''} · {phaseLabel}
+                        <div style={{ fontSize: '11px', color: 'var(--text-3)', display: 'flex', gap: '8px', alignItems: 'center', marginTop: '4px', flexWrap: 'wrap' }}>
+                          <span>{doc.status}</span>
+                          {doc.total_pages > 0 && <span>{doc.total_pages} pages</span>}
+                          <span style={{ display: 'inline-block', padding: '2px 8px', borderRadius: '999px', fontSize: '10px', fontWeight: 700, background: 'rgba(37,99,235,0.12)', color: '#1D4ED8' }}>
+                            {phaseLabel}
+                          </span>
                         </div>
                       </div>
                       {doc.file_name ? (
-                        <a
-                          href={`${BACKEND_URL}/pdf/file/${encodeURIComponent(selectedCase)}/${encodeURIComponent(doc.file_name)}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          title="View document"
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            window.open(`${BACKEND_URL}/api/pdf/file/${encodeURIComponent(selectedCase)}/${encodeURIComponent(doc.file_name)}`, '_blank');
+                          }}
+                          title="Open PDF in new tab"
                           style={viewIconBtn}
                         >
                           <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                             <path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z" />
                             <circle cx="12" cy="12" r="3" />
                           </svg>
-                        </a>
+                        </button>
                       ) : null}
                     </div>
                     );
@@ -615,11 +668,35 @@ export default function DocumentProcessorPage() {
 
           {uiStage === 'done' && (
             <div style={{ display: 'grid', gap: '10px' }}>
-              <h3 style={h3}>✓ Extraction Complete</h3>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <h3 style={h3}>✓ Extraction Complete</h3>
+                <button
+                  onClick={handleSaveToCase}
+                  disabled={savingToCase}
+                  style={{ ...primaryBtn, padding: '8px 12px', fontSize: '12px' }}
+                >
+                  {savingToCase ? 'Saving...' : 'Save to Case'}
+                </button>
+              </div>
+              {saveSuccess && <div style={{ color: '#166534', fontSize: '12px', fontWeight: 600 }}>{saveSuccess}</div>}
               <div style={muted}>
                 {subdocs.length} documents found · {totalPages} pages processed
               </div>
-              <div style={{ display: 'grid', gap: '8px', maxHeight: '560px', overflow: 'auto' }}>
+              
+              <div style={{ display: 'grid', gap: '16px', maxHeight: '560px', overflow: 'auto' }}>
+                <div style={{ fontWeight: 700, fontSize: '14px', borderBottom: '1px solid var(--border)', paddingBottom: '8px' }}>Page-wise Data</div>
+                {pagesData.map((p, idx) => (
+                  <div key={p.page_number} style={{ display: 'grid', gap: '6px' }}>
+                    <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text)' }}>Page {p.page_number}</div>
+                    <textarea
+                      value={p.page_text || ''}
+                      onChange={(e) => handlePageTextChange(idx, e.target.value)}
+                      style={{ ...input, minHeight: '120px', resize: 'vertical', fontFamily: 'monospace' }}
+                    />
+                  </div>
+                ))}
+                
+                <div style={{ fontWeight: 700, fontSize: '14px', borderBottom: '1px solid var(--border)', paddingBottom: '8px', marginTop: '16px' }}>Detected Sub-Documents</div>
                 {subdocs.map((item, index) => (
                   <div key={`${item.id}-${index}`} style={docRow}>
                     <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text)' }}>
@@ -636,7 +713,8 @@ export default function DocumentProcessorPage() {
           )}
         </div>
       </div>
-    </div>
+      </div>
+    </>
   );
 }
 
@@ -835,6 +913,9 @@ const viewIconBtn = {
   justifyContent: 'center',
   flexShrink: 0,
   textDecoration: 'none',
+  cursor: 'pointer',
+  padding: 0,
+  transition: 'all 0.2s',
 };
 
 const indexBadge = {

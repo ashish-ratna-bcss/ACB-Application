@@ -5,3 +5,6 @@ export { default as DocumentList } from './DocumentList';
 export { default as PhasePanel } from './PhasePanel';
 export { default as PhaseTracker } from './PhaseTracker';
 export { default as CaseFlowSteps, ComplaintsList } from './CaseFlowSteps';
+export { default as ReportDocumentView } from './ReportDocumentView';
+export { default as DraftingProgress } from './DraftingProgress';
+export { default as DocumentViewerModal } from './DocumentViewerModal';
