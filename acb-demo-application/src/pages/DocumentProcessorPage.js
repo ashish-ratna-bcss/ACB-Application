@@ -575,26 +575,25 @@ export default function DocumentProcessorPage() {
         </div>
 
         <div style={{ display: 'grid', gap: '14px', gridTemplateRows: 'auto auto' }}>
-          {/* Document Viewer Section */}
           {uiStage === 'idle' && viewingDocument && (
-            <div style={{ ...card, display: 'grid', gridTemplateRows: 'auto 1fr', gap: 0 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px' }}>
-                <div>
-                  <h3 style={{ ...h3, margin: 0 }}>{viewingDocument.original_name || viewingDocument.file_name}</h3>
-                  <div style={{ fontSize: '11px', display: 'flex', gap: '8px', alignItems: 'center', marginTop: '6px' }}>
-                    <span style={{ color: 'var(--text-3)' }}>{viewingDocument.status}</span>
-                    {viewingDocument.total_pages > 0 && <span style={{ color: 'var(--text-3)' }}>{viewingDocument.total_pages} pages</span>}
-                    <span style={{ display: 'inline-block', padding: '2px 8px', borderRadius: '999px', fontWeight: 700, background: 'rgba(37,99,235,0.12)', color: '#1D4ED8' }}>
-                      {viewingDocument.phase ? CASE_PHASES.find((p) => p.key === viewingDocument.phase)?.label || viewingDocument.phase : 'No phase'}
-                    </span>
+            <>
+              <div style={{ ...card, padding: '16px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
+                  <div>
+                    <h3 style={{ ...h3, margin: 0 }}>{viewingDocument.original_name || viewingDocument.file_name}</h3>
+                    <div style={{ fontSize: '11px', display: 'flex', gap: '8px', alignItems: 'center', marginTop: '6px' }}>
+                      <span style={{ color: 'var(--text-3)' }}>{viewingDocument.status}</span>
+                      {viewingDocument.total_pages > 0 && <span style={{ color: 'var(--text-3)' }}>{viewingDocument.total_pages} pages</span>}
+                      <span style={{ display: 'inline-block', padding: '2px 8px', borderRadius: '999px', fontWeight: 700, background: 'rgba(37,99,235,0.12)', color: '#1D4ED8' }}>
+                        {viewingDocument.phase ? CASE_PHASES.find((p) => p.key === viewingDocument.phase)?.label || viewingDocument.phase : 'No phase'}
+                      </span>
+                    </div>
                   </div>
+                  <button onClick={() => { setViewingDocument(null); setViewingDocumentContent(null); }} style={{ background: 'none', border: 'none', color: 'var(--text-3)', fontSize: '16px', cursor: 'pointer', flexShrink: 0 }}>✕</button>
                 </div>
-                <button onClick={() => { setViewingDocument(null); setViewingDocumentContent(null); }} style={{ background: 'none', border: 'none', color: 'var(--text-3)', fontSize: '16px', cursor: 'pointer', flexShrink: 0 }}>✕</button>
               </div>
-            </div>
 
-            {/* Viewer Container - White Box */}
-            <div style={{ ...card, height: '350px', padding: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+              <div style={{ ...card, height: '350px', padding: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
               {pdfViewerOpen ? (
                 <>
                   {!iframeLoaded && (
@@ -666,7 +665,7 @@ export default function DocumentProcessorPage() {
                   </div>
                 )}
               </div>
-            )}
+            </>
           )}
 
           {uiStage === 'idle' && !viewingDocument && (
