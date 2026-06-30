@@ -76,6 +76,7 @@ def _case_to_list_item(c: Case) -> dict[str, Any]:
         "caseId": c.id,
         "trackingId": c.tracking_id or c.case_number,
         "accused": c.accused_name or "—",
+        "designation": c.accused_designation or "",
         "department": c.accused_department or "—",
         "location": c.location or "—",
         "priority": c.priority or "medium",

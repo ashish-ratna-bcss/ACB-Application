@@ -19,6 +19,7 @@ import {
   ProsecutionPage,
   LoginPage
 } from './pages';
+import { AuthProvider } from './context/AuthContext';
 
 function RequireAuth({ children }) {
   if (!sessionStorage.getItem('acb_auth')) {
@@ -29,6 +30,7 @@ function RequireAuth({ children }) {
 
 function App() {
   return (
+    <AuthProvider>
     <Router>
       <Routes>
         <Route path="/login" element={<LoginPage />} />
@@ -53,6 +55,7 @@ function App() {
         </Route>
       </Routes>
     </Router>
+    </AuthProvider>
   );
 }
 

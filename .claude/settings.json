@@ -1,0 +1,25 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(netstat -tlnp)",
+      "Bash(agent-browser skills *)",
+      "Bash(agent-browser open *)",
+      "Bash(agent-browser snapshot *)",
+      "Bash(agent-browser click *)",
+      "Bash(agent-browser screenshot *)",
+      "Bash(agent-browser get *)",
+      "Bash(agent-browser fill *)",
+      "Bash(agent-browser evaluate *)",
+      "Bash(agent-browser press *)",
+      "Bash(agent-browser close *)",
+      "Bash(curl -s http://localhost:8000/health)",
+      "Bash(pkill -f \"npm start\")",
+      "Bash(pkill -f \"python main.py\")",
+      "Bash(grep -E \"\\\\.\\(js|jsx\\)$\")",
+      "Bash(npm list *)",
+      "Bash(awk '/^  return \\\\\\(/,/^  \\\\\\);/' /home/ashish-ratna/ACB/ACB/acb-demo-application/src/pages/DocumentProcessorPage.js)",
+      "Bash(npx tsc *)",
+      "Bash(node -c src/pages/DocumentProcessorPage.js)"
+    ]
+  }
+}

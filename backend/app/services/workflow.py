@@ -68,11 +68,15 @@ PHASE_SUBSTATUSES: dict[str, list[str]] = {
     "prosecution": ["preparing", "filed", "trial", "convicted", "acquitted", "dismissed"],
 }
 
-# Role-gated transitions (simplified RBAC until auth is wired)
+# Role-gated transitions — ACB RBAC
+# io = Inspector/Trap Officer (phases 1-4) + Investigating Officer (phases 5-9)
+# dsp = Supervisory officer; advances case into approval (submits trap permission note to HO)
+# ho = Head Office; grants trap permission (advances to trap) and validates prosecution
+# admin = full access
 ROLE_TRANSITIONS: dict[str, set[str]] = {
-    "io": {"complaint", "verification", "trap", "remand", "investigation", "evidence"},
-    "dsp": {"verification", "approval", "investigation"},
-    "ho": {"approval", "prosecution"},
+    "io": {"verification", "trap", "remand", "investigation", "evidence", "court", "prosecution"},
+    "dsp": {"complaint", "verification", "approval", "remand", "investigation"},
+    "ho": {"trap", "prosecution"},
     "admin": set(PHASE_ORDER),
 }
 

@@ -17,18 +17,16 @@ export default function CaseHeaderBand({ caseData }) {
               <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#1D4ED8', animation: 'acbPulse 2s ease infinite' }}></span>{caseData.statusLabel}
             </span>
           </div>
-          <div style={{ fontSize: '13.5px', color: 'var(--text-2)', marginTop: '6px' }}>{caseData.ao.desig} · {caseData.ao.dept} · {caseData.ao.station}</div>
+          <div style={{ fontSize: '13.5px', color: 'var(--text-2)', marginTop: '6px' }}>
+            {[caseData.ao.desig, caseData.ao.dept, caseData.ao.station].filter(Boolean).join(' · ') || '—'}
+          </div>
         </div>
-        <div style={{ display: 'flex', gap: '10px', flexShrink: 0 }}>
-          <div style={{ textAlign: 'right', paddingRight: '18px', borderRight: '1px solid var(--border)' }}>
+        {caseData.trapAmount && (
+          <div style={{ textAlign: 'right', flexShrink: 0 }}>
             <div style={{ fontSize: '10.5px', fontWeight: 600, letterSpacing: '0.4px', color: 'var(--text-3)', textTransform: 'uppercase' }}>Trap Amount</div>
-            <div style={{ fontSize: '21px', fontWeight: 700, color: '#16A34A', fontFamily: "'JetBrains Mono',monospace", marginTop: '3px' }}>₹50,000</div>
+            <div style={{ fontSize: '21px', fontWeight: 700, color: '#16A34A', fontFamily: "'JetBrains Mono',monospace", marginTop: '3px' }}>{caseData.trapAmount}</div>
           </div>
-          <div style={{ textAlign: 'right' }}>
-            <div style={{ fontSize: '10.5px', fontWeight: 600, letterSpacing: '0.4px', color: 'var(--text-3)', textTransform: 'uppercase' }}>Legal Section</div>
-            <div style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text)', marginTop: '6px' }}>Sec. 7, P.C. Act 1988</div>
-          </div>
-        </div>
+        )}
       </div>
     </div>
   );

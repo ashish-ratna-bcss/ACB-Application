@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import PdfViewerModal from '../components/PdfViewerModal';
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8000';
 
@@ -75,6 +76,9 @@ export default function DocumentProcessorPage() {
   const [viewingDocument, setViewingDocument] = useState(null);
   const [viewingDocumentContent, setViewingDocumentContent] = useState(null);
   const [viewingDocLoading, setViewingDocLoading] = useState(false);
+  const [pdfViewerOpen, setPdfViewerOpen] = useState(false);
+  const [pdfViewerUrl, setPdfViewerUrl] = useState(null);
+  const [pdfViewerFileName, setPdfViewerFileName] = useState(null);
 
   const fileInputRef = useRef(null);
   const xhrRef = useRef(null);
@@ -153,6 +157,13 @@ export default function DocumentProcessorPage() {
     } finally {
       setViewingDocLoading(false);
     }
+  }, [selectedCase]);
+
+  const openPdfViewer = useCallback((doc) => {
+    const url = `${BACKEND_URL}/api/pdf/file/${encodeURIComponent(selectedCase)}/${encodeURIComponent(doc.file_name)}`;
+    setPdfViewerUrl(url);
+    setPdfViewerFileName(doc.original_name || doc.file_name);
+    setPdfViewerOpen(true);
   }, [selectedCase]);
 
   const getStageStatus = useCallback(
@@ -515,9 +526,9 @@ export default function DocumentProcessorPage() {
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
-                            window.open(`${BACKEND_URL}/api/pdf/file/${encodeURIComponent(selectedCase)}/${encodeURIComponent(doc.file_name)}`, '_blank');
+                            openPdfViewer(doc);
                           }}
-                          title="Open PDF in new tab"
+                          title="View document"
                           style={viewIconBtn}
                         >
                           <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -591,9 +602,9 @@ export default function DocumentProcessorPage() {
 
               {viewingDocument.file_name && (
                 <div style={{ marginTop: '12px' }}>
-                  <a href={`${BACKEND_URL}/api/pdf/file/${encodeURIComponent(selectedCase)}/${encodeURIComponent(viewingDocument.file_name)}`} target="_blank" rel="noopener noreferrer" style={{ ...primaryBtn, textDecoration: 'none', display: 'block', textAlign: 'center' }}>
+                  <button onClick={() => openPdfViewer(viewingDocument)} style={{ ...primaryBtn, width: '100%', cursor: 'pointer' }}>
                     View Original PDF
-                  </a>
+                  </button>
                 </div>
               )}
 
@@ -781,6 +792,12 @@ export default function DocumentProcessorPage() {
           )}
         </div>
       </div>
+      <PdfViewerModal
+        isOpen={pdfViewerOpen}
+        onClose={() => setPdfViewerOpen(false)}
+        pdfUrl={pdfViewerUrl}
+        fileName={pdfViewerFileName}
+      />
     </div>
   );
 }

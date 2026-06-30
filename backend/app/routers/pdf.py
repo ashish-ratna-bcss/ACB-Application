@@ -234,6 +234,66 @@ def get_document_logs(document_id: int):
     return {"document_id": document_id, "logs": get_logs(document_id)}
 
 
+# ── Page-wise Text ────────────────────────────────────────────────────────────
+
+@router.get("/pages/{document_id}", summary="Get page-wise text for a document")
+def get_document_pages(document_id: int):
+    from app.models import PageContent
+    db: Session = SessionLocal()
+    try:
+        pages = db.query(PageContent).filter(PageContent.document_id == document_id).order_by(PageContent.page_number).all()
+        return {
+            "document_id": document_id,
+            "pages": [{"page_number": p.page_number, "page_text": p.page_text} for p in pages]
+        }
+    finally:
+        db.close()
+
+
+class SavePagesRequest(BaseModel):
+    pages: list[dict]  # [{"page_number": int, "page_text": str}]
+
+@router.post("/save-to-case/{document_id}", summary="Save edited text to case as evidence")
+def save_pages_to_case(document_id: int, req: SavePagesRequest):
+    from app.models import PageContent, EvidenceItem
+    import uuid
+    db: Session = SessionLocal()
+    try:
+        doc = db.query(Document).filter(Document.id == document_id).first()
+        if not doc:
+            raise HTTPException(status_code=404, detail="Document not found")
+
+        # Update page content
+        for p in req.pages:
+            db.query(PageContent).filter(
+                PageContent.document_id == document_id,
+                PageContent.page_number == p.get("page_number")
+            ).update({"page_text": p.get("page_text")})
+
+        # Add as evidence if not exists
+        title = doc.original_name or doc.file_name
+        existing = db.query(EvidenceItem).filter(
+            EvidenceItem.case_id == doc.case_id,
+            EvidenceItem.title == title
+        ).first()
+
+        if not existing:
+            item = EvidenceItem(
+                id=str(uuid.uuid4()),
+                case_id=doc.case_id,
+                evidence_type="document",
+                title=title,
+                description="Document processed and verified via AI Processor",
+                status="logged"
+            )
+            db.add(item)
+
+        db.commit()
+        return {"status": "ok", "message": "Successfully saved to case"}
+    finally:
+        db.close()
+
+
 # ── List ─────────────────────────────────────────────────────────────────────
 
 @router.get("/list", summary="List all uploaded documents")

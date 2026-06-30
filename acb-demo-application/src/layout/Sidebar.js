@@ -2,10 +2,12 @@ import React, { useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { api } from '../utils/api';
 import { isPhaseNavLocked } from '../utils/workflow';
+import { useAuth } from '../context/AuthContext';
 
 export default function Sidebar() {
   const navigate = useNavigate();
   const location = useLocation();
+  const { user, logout } = useAuth();
   const [complaintCount, setComplaintCount] = useState(null);
   const [phaseCounts, setPhaseCounts] = useState({});
 
@@ -112,24 +114,25 @@ export default function Sidebar() {
 
       <div ref={profileRef} style={{ flexShrink: 0, padding: '12px', borderTop: '1px solid #1A2230', position: 'relative' }}>
         <button onClick={() => setProfileOpen(!profileOpen)} style={{ width: '100%', border: 'none', background: 'transparent', display: 'flex', alignItems: 'center', gap: '11px', cursor: 'pointer', padding: 0 }}>
-          <div style={{ width: '36px', height: '36px', borderRadius: '9px', background: 'linear-gradient(135deg,#007A33,#00C853)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 700, fontSize: '13px', flexShrink: 0 }}>PR</div>
+          <div style={{ width: '36px', height: '36px', borderRadius: '9px', background: user?.color || '#007A33', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 700, fontSize: '13px', flexShrink: 0 }}>{user?.initials || '?'}</div>
           <div style={{ flex: 1, minWidth: 0, textAlign: 'left' }}>
-            <div style={{ fontSize: '12.5px', fontWeight: 600, color: '#E6EBF2' }}>Insp. D. Prakash Reddy</div>
-            <div style={{ fontSize: '10.5px', color: '#7C8AA0' }}>CIU · Warangal Range · IO</div>
+            <div style={{ fontSize: '12.5px', fontWeight: 600, color: '#E6EBF2', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user?.name || 'Unknown'}</div>
+            <div style={{ fontSize: '10.5px', color: '#7C8AA0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user?.unit || ''}</div>
           </div>
         </button>
 
         {profileOpen && (
           <div style={{ position: 'absolute', bottom: 'calc(100% + 8px)', left: '12px', right: '12px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '12px', boxShadow: 'var(--shadow)', zIndex: 50, overflow: 'hidden' }}>
             <div style={{ padding: '12px', borderBottom: '1px solid var(--border)' }}>
-              <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text)', marginBottom: '2px' }}>Insp. D. Prakash Reddy</div>
-              <div style={{ fontSize: '11px', color: 'var(--text-3)' }}>CIU · Warangal Range</div>
-              <div style={{ fontSize: '11px', color: 'var(--text-3)', marginTop: '2px' }}>Investigation Officer</div>
+              <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text)', marginBottom: '2px' }}>{user?.name}</div>
+              <div style={{ fontSize: '11px', color: 'var(--text-3)' }}>{user?.unit}</div>
+              <div style={{ fontSize: '11px', color: 'var(--text-3)', marginTop: '2px' }}>{user?.designation}</div>
+              <div style={{ marginTop: '6px', display: 'inline-block', fontSize: '10px', fontWeight: 700, background: 'rgba(255,255,255,0.06)', color: '#8597AD', padding: '2px 7px', borderRadius: '20px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>{user?.role}</div>
             </div>
             <button onClick={() => { navigate('/settings'); setProfileOpen(false); }} style={{ width: '100%', border: 'none', background: 'transparent', padding: '10px 12px', textAlign: 'left', fontSize: '12px', fontWeight: 600, color: 'var(--text-2)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }}>
               ⚙️ Settings
             </button>
-            <button onClick={() => { sessionStorage.removeItem('acb_auth'); navigate('/login'); setProfileOpen(false); }} style={{ width: '100%', border: 'none', background: 'transparent', padding: '10px 12px', textAlign: 'left', fontSize: '12px', fontWeight: 600, color: '#EF4444', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', borderTop: '1px solid var(--border)' }}>
+            <button onClick={() => { logout(); navigate('/login'); setProfileOpen(false); }} style={{ width: '100%', border: 'none', background: 'transparent', padding: '10px 12px', textAlign: 'left', fontSize: '12px', fontWeight: 600, color: '#EF4444', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', borderTop: '1px solid var(--border)' }}>
               ↪️ Logout
             </button>
           </div>

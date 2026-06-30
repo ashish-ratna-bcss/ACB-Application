@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8000';
-const API_BASE = `${BACKEND_URL}/speech-intel`;
+const API_BASE = `${BACKEND_URL}/api/speech-intel`;
 const POLL_INTERVAL_MS = 4000;
 const ACCEPTED_HINT = 'WAV, MP3, M4A, MP4, MOV, WebM, OGG and similar audio/video files';
 
@@ -123,7 +123,7 @@ export default function SpeechIntelligencePage() {
   }, []);
 
   useEffect(() => {
-    fetch(`${BACKEND_URL}/cases`)
+    fetch(`${BACKEND_URL}/api/cases`)
       .then((r) => r.json())
       .then((d) => setCases(Array.isArray(d) ? d : []))
       .catch(() => setCases([]));
@@ -576,6 +576,17 @@ export default function SpeechIntelligencePage() {
                   </div>
                 ) : null}
 
+                {!viewingHistory && (recordingUrl || selectedFile) ? (
+                  <div style={mediaPlayerBox}>
+                    <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text-2)', marginBottom: '8px' }}>Media Playback</div>
+                    {recordingUrl ? (
+                      <audio controls style={mediaPlayer} src={recordingUrl} />
+                    ) : selectedFile ? (
+                      <audio controls style={mediaPlayer} src={URL.createObjectURL(selectedFile)} />
+                    ) : null}
+                  </div>
+                ) : null}
+
                 {!transcriptText && !rows.length ? (
                   <div style={warnBox}>No speech detected in this media — transcript and conversation table are empty.</div>
                 ) : null}
@@ -705,3 +716,5 @@ const dropdownItemActive = { borderColor: 'rgba(22,163,74,0.3)', background: 'va
 const dropdownEmpty = { border: '1px dashed var(--border)', borderRadius: '9px', padding: '10px', fontSize: '12px', color: 'var(--text-3)', textAlign: 'center' };
 const historyItem = { border: '1px solid var(--border)', borderRadius: '10px', background: 'var(--surface-2)', padding: '9px 11px', textAlign: 'left', cursor: 'pointer', width: '100%' };
 const historyItemActive = { borderColor: 'rgba(37,99,235,0.4)', background: 'rgba(37,99,235,0.08)' };
+const mediaPlayerBox = { border: '1px solid var(--border)', borderRadius: '10px', background: 'var(--surface-2)', padding: '12px' };
+const mediaPlayer = { width: '100%', borderRadius: '6px' };

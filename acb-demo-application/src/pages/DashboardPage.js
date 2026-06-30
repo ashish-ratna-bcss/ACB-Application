@@ -23,7 +23,7 @@ export default function DashboardPage() {
     let cancelled = false;
     Promise.all([
       api.getDashboardKpis().catch(() => null),
-      fetch(`${BACKEND_URL}/pdf/stats`).then((r) => (r.ok ? r.json() : null)).catch(() => null),
+      fetch(`${BACKEND_URL}/api/pdf/stats`).then((r) => (r.ok ? r.json() : null)).catch(() => null),
     ])
       .then(([dash, pdfStats]) => {
         if (cancelled) return;

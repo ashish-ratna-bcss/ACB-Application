@@ -21,6 +21,11 @@ BASE_URL = os.getenv("SPEECH_INTEL_BASE_URL", "http://98.86.63.69").rstrip("/")
 API_KEY = os.getenv("SPEECH_INTEL_API_KEY", "")  # set in backend/.env
 HEADERS = {"X-API-Key": API_KEY}
 TIMEOUT = httpx.Timeout(120.0, connect=15.0)
+# Uploads stream large evidence videos to the remote service over the laptop's
+# (slow ~1 MB/s) upstream link — a 120s read timeout 502s on anything big. Give
+# uploads no read timeout (keep a connect timeout) so a multi-hundred-MB file
+# transfers fully instead of being cut off mid-upload.
+UPLOAD_TIMEOUT = httpx.Timeout(None, connect=15.0)
 
 
 def _forward(response: httpx.Response) -> JSONResponse:
@@ -61,7 +66,7 @@ async def upload_file(case_id: str, audio: UploadFile = File(...)):
     data = await audio.read()
     files = {"audio": (audio.filename or "upload", data, audio.content_type or "application/octet-stream")}
     try:
-        async with httpx.AsyncClient(timeout=TIMEOUT) as client:
+        async with httpx.AsyncClient(timeout=UPLOAD_TIMEOUT) as client:
             res = await client.post(f"{BASE_URL}/cases/{case_id}/files", headers=HEADERS, files=files)
     except httpx.HTTPError as exc:
         raise _upstream_error(exc) from exc

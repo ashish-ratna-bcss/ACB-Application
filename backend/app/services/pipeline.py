@@ -201,16 +201,36 @@ def run_pipeline(document_id: int, case_id: str, file_name: str, start_stage: st
                 if page_contents:
                     reconstructed = [(pc.page_number, pc.page_text) for pc in page_contents]
 
+        # Ensure reconstructed data is loaded for extraction stage
+        if reconstructed is None and start_idx >= STAGES_LIST.index(STAGE_EXTRACT):
+            page_contents = db.query(PageContent).filter(
+                PageContent.document_id == document_id
+            ).order_by(PageContent.page_number).all()
+            if page_contents:
+                reconstructed = [(pc.page_number, pc.page_text) for pc in page_contents]
+
         # ── Step 4: AI Sub-document Detection ────────────────────────────────
         subdocs = None
-        if start_idx <= STAGES_LIST.index(STAGE_DETECT):
+        run_subdoc_detection = doc.phase == "Full Case Document"
+
+        if run_subdoc_detection and start_idx <= STAGES_LIST.index(STAGE_DETECT):
             _stage(db, doc, "processing", STAGE_DETECT)
             set_stage_progress(document_id, STAGE_DETECT, 0, 0, "pages")
-            logger.info(f"[doc={document_id}] Detecting sub-documents across {total_pages} pages")
+            logger.info(f"[doc={document_id}] Detecting sub-documents across {total_pages} pages (phase={doc.phase})")
 
             subdocs = detect_subdocuments(reconstructed, document_id=document_id)
             set_stage_progress(document_id, STAGE_DETECT, total_pages, total_pages, "pages")
             logger.info(f"[doc={document_id}] Found {len(subdocs)} sub-document(s)")
+        elif not run_subdoc_detection and start_idx <= STAGES_LIST.index(STAGE_DETECT):
+            logger.info(f"[doc={document_id}] Skipping sub-document detection (phase={doc.phase}, not 'Full Case Document')")
+            _mark_stage_completed(db, document_id, STAGE_DETECT)
+            subdocs = [{
+                "title": "Document",
+                "document_type": doc.phase or "Document",
+                "start_page": 1,
+                "end_page": total_pages,
+                "confidence": 1.0
+            }]
 
             # Store checkpoint
             for subdoc in subdocs:
@@ -248,16 +268,23 @@ def run_pipeline(document_id: int, case_id: str, file_name: str, start_stage: st
             set_stage_progress(document_id, STAGE_EXTRACT, 0, total_subdocs, "sub-documents")
             logger.info(f"[doc={document_id}] Extracting content from {total_subdocs} sub-document(s)")
 
-            extracted = []
-            for i, subdoc in enumerate(subdocs, start=1):
+            from app.services.ai_content_extraction import extract_batch
+
+            texts_to_extract = []
+            for subdoc in subdocs:
                 start = subdoc.get("start_page", 1)
                 end = subdoc.get("end_page", total_pages)
-                logger.info(f"[doc={document_id}]   [{i}/{total_subdocs}] Extracting: '{subdoc.get('title', '')}' (pp {start}–{end})")
                 full_text = "\n\n".join(page_map[pn] for pn in sorted(page_map) if start <= pn <= end)
-                content = extract_content(full_text)
+                texts_to_extract.append(full_text)
+
+            logger.info(f"[doc={document_id}] Running parallel extraction on {total_subdocs} subdoc(s)")
+            extracted_contents = extract_batch(texts_to_extract)
+
+            extracted = []
+            for i, (subdoc, content) in enumerate(zip(subdocs, extracted_contents), start=1):
+                logger.info(f"[doc={document_id}]   [{i}/{total_subdocs}] Extracted: '{subdoc.get('title', '')}'")
                 extracted.append((subdoc, content))
 
-                # Store checkpoint
                 db.add(ExtractedContent(
                     document_id=document_id,
                     subdoc_title=subdoc.get("title"),
@@ -270,8 +297,9 @@ def run_pipeline(document_id: int, case_id: str, file_name: str, start_stage: st
                     key_actions=json.dumps(content.get("key_actions") or []),
                     organizations=json.dumps(content.get("important_organizations") or [])
                 ))
-                db.commit()
                 set_stage_progress(document_id, STAGE_EXTRACT, i, total_subdocs, "sub-documents")
+
+            db.commit()
             _mark_stage_completed(db, document_id, STAGE_EXTRACT)
         elif start_idx <= STAGES_LIST.index(STAGE_STORE):
             # Load from checkpoint
@@ -319,7 +347,6 @@ def run_pipeline(document_id: int, case_id: str, file_name: str, start_stage: st
                 db.flush()
                 subdoc_ids.append(sd.id)
 
-                # Extract structured evidence from main content
                 main_content = content.get("main_content", "")
                 evidence = extract_all_evidence(main_content)
                 evidence_json = serialize_evidence(evidence)
@@ -339,8 +366,8 @@ def run_pipeline(document_id: int, case_id: str, file_name: str, start_stage: st
                     evidence_objects=evidence_json,
                 ))
                 set_stage_progress(document_id, STAGE_STORE, i, total_subdocs, "sub-documents")
-                logger.info(f"[doc={document_id}]   Stored sub-doc {i}/{total_subdocs}")
 
+            logger.info(f"[doc={document_id}] Batch committing {total_subdocs} sub-documents")
             db.commit()
             _mark_stage_completed(db, document_id, STAGE_STORE)
 

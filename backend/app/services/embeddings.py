@@ -1,6 +1,7 @@
 import logging
 import os
 import uuid
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from app.config import EMBEDDING_DIM, OLLAMA_EMBED_MODEL, OLLAMA_TIMEOUT, OLLAMA_URL, QDRANT_COLLECTION, QDRANT_URL
 
@@ -47,14 +48,13 @@ def store_subdoc_embeddings(
         _ensure_collection(qdrant)
 
         total  = len(extracted)
-        points: list[PointStruct] = []
 
+        embedding_tasks = []
         for i, (subdoc_meta, content) in enumerate(extracted, start=1):
-            sd_id       = subdoc_ids[i - 1] if subdoc_ids else None
+            sd_id       = subdoc_ids[i - 1] if subdoc_ids and i <= len(subdoc_ids) else None
             main_text   = content.get("main_content") or ""
             text_chunks = _chunks(main_text)
 
-            # Shared context fields prepended to every chunk
             header = "\n".join(filter(None, [
                 content.get("title"),
                 content.get("subject"),
@@ -65,16 +65,38 @@ def store_subdoc_embeddings(
 
             for chunk_idx, chunk_text in enumerate(text_chunks):
                 embed_text = f"{header}\n{chunk_text}".strip()[:8000]
+                if embed_text:
+                    embedding_tasks.append({
+                        "embed_text": embed_text,
+                        "sd_id": sd_id,
+                        "chunk_idx": chunk_idx,
+                        "chunk_total": len(text_chunks),
+                        "subdoc_idx": i,
+                        "subdoc_meta": subdoc_meta,
+                    })
 
-                if not embed_text:
-                    logger.debug(f"Skipping empty chunk {chunk_idx} for sub-doc {sd_id}")
-                    continue
+        logger.info(f"Generating {len(embedding_tasks)} embeddings in parallel")
 
-                resp   = ollama_client.embeddings(model=embed_model, prompt=embed_text)
-                vector = resp.embedding
+        def embed_chunk(task):
+            try:
+                resp = ollama_client.embeddings(model=embed_model, prompt=task["embed_text"])
+                return task, resp.embedding if resp else None
+            except Exception as e:
+                logger.warning(f"Embedding failed for chunk {task['chunk_idx']}: {e}")
+                return task, None
+
+        points: list[PointStruct] = []
+        last_progress = 0
+
+        with ThreadPoolExecutor(max_workers=6) as executor:
+            futures = {executor.submit(embed_chunk, task): task for task in embedding_tasks}
+            completed = 0
+            for future in as_completed(futures):
+                task, vector = future.result()
+                completed += 1
 
                 if not vector:
-                    logger.warning(f"Ollama returned empty vector for chunk {chunk_idx} sub-doc {sd_id} — skipping")
+                    logger.debug(f"Skipping empty embedding for chunk {task['chunk_idx']} sub-doc {task['sd_id']}")
                     continue
 
                 points.append(PointStruct(
@@ -83,18 +105,20 @@ def store_subdoc_embeddings(
                     payload={
                         "case_id":         case_id,
                         "document_id":     document_id,
-                        "sub_document_id": sd_id,
-                        "title":           subdoc_meta.get("title"),
-                        "document_type":   subdoc_meta.get("document_type"),
-                        "start_page":      subdoc_meta.get("start_page"),
-                        "end_page":        subdoc_meta.get("end_page"),
-                        "chunk_index":     chunk_idx,
-                        "chunk_total":     len(text_chunks),
+                        "sub_document_id": task["sd_id"],
+                        "title":           task["subdoc_meta"].get("title"),
+                        "document_type":   task["subdoc_meta"].get("document_type"),
+                        "start_page":      task["subdoc_meta"].get("start_page"),
+                        "end_page":        task["subdoc_meta"].get("end_page"),
+                        "chunk_index":     task["chunk_idx"],
+                        "chunk_total":     task["chunk_total"],
                     },
                 ))
 
-            if progress_callback:
-                progress_callback(i, total)
+                if progress_callback and completed % max(1, len(embedding_tasks) // total) == 0:
+                    last_progress = min(completed // max(1, len(embedding_tasks) // total), total)
+                    if last_progress > 0:
+                        progress_callback(last_progress, total)
 
         if points:
             qdrant.upsert(collection_name=QDRANT_COLLECTION, points=points)

@@ -1,9 +1,18 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
+import { useAuth, USERS } from '../context/AuthContext';
+
+const ROLE_LABELS = {
+  io: 'Inspector / Trap Officer',
+  dsp: 'Dy. Superintendent of Police',
+  ho: 'Joint Director (Operations)',
+  admin: 'System Administrator',
+};
 
 export default function LoginPage() {
   const navigate = useNavigate();
+  const { login } = useAuth();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -15,11 +24,13 @@ export default function LoginPage() {
       setError('Enter username and password');
       return;
     }
-    sessionStorage.setItem('acb_auth', '1');
-    setTransitioning(true);
-    setTimeout(() => {
-      navigate('/');
-    }, 2500);
+    try {
+      login(username, password);
+      setTransitioning(true);
+      setTimeout(() => navigate('/'), 2500);
+    } catch {
+      setError('Invalid username or password');
+    }
   };
 
   // Post-login transition: animated logo
@@ -161,6 +172,26 @@ export default function LoginPage() {
             Sign In
           </button>
         </form>
+
+        {/* Demo credentials hint */}
+        <div style={{ width: '100%', background: 'rgba(255,255,255,0.03)', borderRadius: 8, border: '1px solid rgba(255,255,255,0.06)', padding: '10px 12px' }}>
+          <div style={{ fontSize: 10.5, fontWeight: 600, color: '#5A687E', textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: 7 }}>Demo Credentials</div>
+          {Object.entries(USERS).map(([uname, info]) => (
+            <button
+              key={uname}
+              type="button"
+              onClick={() => { setUsername(uname); setPassword('password'); setError(''); }}
+              style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', background: 'transparent', border: 'none', cursor: 'pointer', padding: '4px 0', borderRadius: 4 }}
+            >
+              <span style={{ width: 22, height: 22, borderRadius: 6, background: info.color, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: 9, fontWeight: 700, flexShrink: 0 }}>{info.initials}</span>
+              <span style={{ fontSize: 11, color: '#7C8AA0', textAlign: 'left' }}>
+                <span style={{ color: '#A0B0C8', fontWeight: 600 }}>{uname}</span>
+                <span style={{ marginLeft: 5, color: '#4A5568' }}>· {ROLE_LABELS[info.role]}</span>
+              </span>
+            </button>
+          ))}
+          <div style={{ fontSize: 10, color: '#3A4A5E', marginTop: 5 }}>Password: <span style={{ fontFamily: 'monospace', color: '#5A6A7E' }}>password</span> for all</div>
+        </div>
 
         <div style={{ color: 'rgba(133,151,173,0.45)', fontSize: 11, textAlign: 'center' }}>
           Secure Government Portal · v2.0

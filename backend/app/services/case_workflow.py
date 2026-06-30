@@ -177,6 +177,21 @@ def get_workflow(db: Session, case: Case, *, view_phase: str | None = None) -> d
     }
 
 
+def _assert_phase_exit_requirements(case: Case, from_phase: str, *, force: bool = False) -> None:
+    """Mandatory artifacts a case must hold before it may leave a phase."""
+    if force:
+        return
+    if from_phase == "verification":
+        pd = json.loads(case.phase_data) if case.phase_data else {}
+        reports = pd.get("verificationReports") or {}
+        if not (reports.get("verbatim_report") and reports.get("verification_report")):
+            raise WorkflowError(
+                "Both the Verbatim Report and the Verification Report must be drafted "
+                "before this case can advance out of the Verification phase.",
+                "reports_required",
+            )
+
+
 def _next_phase(phase: str) -> str | None:
     try:
         idx = PHASE_ORDER.index(phase)
@@ -205,6 +220,7 @@ def transition_case(
 
     if target and target != from_phase:
         validate_transition(from_phase, target, role=actor_role, force=force)
+        _assert_phase_exit_requirements(case, from_phase, force=force)
         db.add(PhaseTransition(
             case_id=case.id,
             from_phase=from_phase,

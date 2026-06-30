@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 
 export default function Header() {
   const navigate = useNavigate();
+  const { logout } = useAuth();
   const [theme, setTheme] = useState('light');
   const [search, setSearch] = useState('');
 
@@ -15,7 +17,7 @@ export default function Header() {
   };
 
   const handleLogout = () => {
-    sessionStorage.removeItem('acb_auth');
+    logout();
     navigate('/login');
   };
   const themeIcon = theme === 'dark'
