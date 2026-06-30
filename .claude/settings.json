@@ -19,7 +19,8 @@
       "Bash(npm list *)",
       "Bash(awk '/^  return \\\\\\(/,/^  \\\\\\);/' /home/ashish-ratna/ACB/ACB/acb-demo-application/src/pages/DocumentProcessorPage.js)",
       "Bash(npx tsc *)",
-      "Bash(node -c src/pages/DocumentProcessorPage.js)"
+      "Bash(node -c src/pages/DocumentProcessorPage.js)",
+      "Bash(node -c /home/ashish-ratna/ACB/ACB/acb-demo-application/src/pages/DocumentProcessorPage.js)"
     ]
   }
 }

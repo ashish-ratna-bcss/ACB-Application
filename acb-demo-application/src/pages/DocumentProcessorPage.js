@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import PdfViewerModal from '../components/PdfViewerModal';
+import DocumentSidePanel from '../components/DocumentSidePanel';
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8000';
 
@@ -147,6 +147,13 @@ export default function DocumentProcessorPage() {
     setViewingDocument(doc);
     setViewingDocLoading(true);
     setViewingDocumentContent(null);
+
+    // Open side panel viewer
+    const url = `${BACKEND_URL}/api/pdf/file/${encodeURIComponent(selectedCase)}/${encodeURIComponent(doc.file_name)}`;
+    setPdfViewerUrl(url);
+    setPdfViewerFileName(doc.original_name || doc.file_name);
+    setPdfViewerOpen(true);
+
     try {
       const res = await fetch(`${BACKEND_URL}/api/pdf/document/${encodeURIComponent(selectedCase)}/${encodeURIComponent(doc.document_id || doc.file_name)}`);
       if (!res.ok) throw new Error('Failed to fetch');
@@ -157,13 +164,6 @@ export default function DocumentProcessorPage() {
     } finally {
       setViewingDocLoading(false);
     }
-  }, [selectedCase]);
-
-  const openPdfViewer = useCallback((doc) => {
-    const url = `${BACKEND_URL}/api/pdf/file/${encodeURIComponent(selectedCase)}/${encodeURIComponent(doc.file_name)}`;
-    setPdfViewerUrl(url);
-    setPdfViewerFileName(doc.original_name || doc.file_name);
-    setPdfViewerOpen(true);
   }, [selectedCase]);
 
   const getStageStatus = useCallback(
@@ -522,21 +522,6 @@ export default function DocumentProcessorPage() {
                           </span>
                         </div>
                       </div>
-                      {doc.file_name ? (
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            openPdfViewer(doc);
-                          }}
-                          title="View document"
-                          style={viewIconBtn}
-                        >
-                          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                            <path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z" />
-                            <circle cx="12" cy="12" r="3" />
-                          </svg>
-                        </button>
-                      ) : null}
                     </div>
                     );
                   })}
@@ -600,13 +585,6 @@ export default function DocumentProcessorPage() {
                 </span>
               </div>
 
-              {viewingDocument.file_name && (
-                <div style={{ marginTop: '12px' }}>
-                  <button onClick={() => openPdfViewer(viewingDocument)} style={{ ...primaryBtn, width: '100%', cursor: 'pointer' }}>
-                    View Original PDF
-                  </button>
-                </div>
-              )}
 
               {viewingDocLoading && <div style={muted}>Loading extracted content...</div>}
 
@@ -792,11 +770,12 @@ export default function DocumentProcessorPage() {
           )}
         </div>
       </div>
-      <PdfViewerModal
+      <DocumentSidePanel
         isOpen={pdfViewerOpen}
         onClose={() => setPdfViewerOpen(false)}
         pdfUrl={pdfViewerUrl}
         fileName={pdfViewerFileName}
+        document={viewingDocument}
       />
     </div>
   );
