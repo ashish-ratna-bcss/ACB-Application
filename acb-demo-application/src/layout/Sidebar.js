@@ -97,7 +97,7 @@ export default function Sidebar() {
     <aside style={{ width: '280px', flexShrink: 0, background: '#0E141F', display: 'flex', flexDirection: 'column', borderRight: '1px solid #1C2433' }}>
       <div style={{ height: '64px', flexShrink: 0, display: 'flex', alignItems: 'center', gap: '12px', padding: '0 18px', borderBottom: '1px solid #1A2230' }}>
         <div style={{ width: '40px', height: '40px' }}>
-          <img src="/acb-logo.png" alt="ACB" style={{ width: '40px', height: '40px', objectFit: 'contain' }} />
+          <img src={`${process.env.PUBLIC_URL}/acb-logo.png`} alt="ACB" style={{ width: '40px', height: '40px', objectFit: 'contain' }} />
         </div>
         <div>
           <div style={{ fontSize: '13px', fontWeight: 700, color: '#fff' }}>ACB · TELANGANA</div>

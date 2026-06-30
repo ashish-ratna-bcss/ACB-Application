@@ -44,7 +44,7 @@ export default function LoginPage() {
         perspective: '1000px',
       }}>
         <motion.img
-          src="/acb-logo.png"
+          src={`${process.env.PUBLIC_URL}/acb-logo.png`}
           alt="ACB Logo"
           initial={{ rotateY: -180, opacity: 0 }}
           animate={{ rotateY: 720, opacity: 1 }}
@@ -97,7 +97,7 @@ export default function LoginPage() {
             background: 'linear-gradient(135deg, rgba(37,99,235,0.6), rgba(29,78,216,0.3))',
           }}>
             <img
-              src="/acb-logo.png"
+              src={`${process.env.PUBLIC_URL}/acb-logo.png`}
               alt="ACB"
               style={{ width: '100%', height: '100%', objectFit: 'contain' }}
             />

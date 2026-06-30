@@ -44,7 +44,7 @@ export default function PageTransitionOverlay() {
       }}
     >
       <motion.img
-        src="/acb-logo.png"
+        src={`${process.env.PUBLIC_URL}/acb-logo.png`}
         alt="logo"
         initial={{ rotateY: -180, opacity: 0 }}
         animate={{ rotateY: 720, opacity: 1 }}

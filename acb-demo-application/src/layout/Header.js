@@ -27,7 +27,7 @@ export default function Header() {
   return (
     <header style={{ height: '64px', flexShrink: 0, display: 'flex', alignItems: 'center', gap: '16px', padding: '0 24px', background: 'var(--surface)', borderBottom: '1px solid var(--border)', zIndex: 5 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-        <img src="/acb-logo.png" alt="ACB Logo" style={{ width: '40px', height: '40px', objectFit: 'contain', background: '#fff' }} />
+        <img src={`${process.env.PUBLIC_URL}/acb-logo.png`} alt="ACB Logo" style={{ width: '40px', height: '40px', objectFit: 'contain', background: '#fff' }} />
         <div style={{ minWidth: 0, flexShrink: 0 }}>
           <div style={{ fontSize: '11px', fontWeight: 600, letterSpacing: '0.5px', color: 'var(--text-3)', textTransform: 'uppercase' }}>Anti-Corruption Bureau</div>
           <div style={{ fontSize: '18px', fontWeight: 700, color: 'var(--text)', lineHeight: 1.2, marginTop: '1px', whiteSpace: 'nowrap' }}>Case Management System</div>

@@ -31,7 +31,7 @@ function RequireAuth({ children }) {
 function App() {
   return (
     <AuthProvider>
-    <Router>
+    <Router basename={process.env.PUBLIC_URL || ''}>
       <Routes>
         <Route path="/login" element={<LoginPage />} />
         <Route element={<RequireAuth><Layout /></RequireAuth>}>

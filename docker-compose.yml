@@ -55,6 +55,7 @@ services:
         # Production mode: nginx proxies /api to backend
         # Frontend calls relative path /api, nginx handles routing
         REACT_APP_BACKEND_URL: "/api"
+        PUBLIC_URL: ""
     container_name: acb-frontend
     restart: unless-stopped
     expose:

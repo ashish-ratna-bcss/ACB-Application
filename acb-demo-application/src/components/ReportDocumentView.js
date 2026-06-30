@@ -1,6 +1,6 @@
 import React from 'react';
 
-const ACB_LOGO_URL = `${window.location.origin}/acb-logo.png`;
+const ACB_LOGO_URL = `${window.location.origin}${process.env.PUBLIC_URL}/acb-logo.png`;
 
 // ── Watermark — centred faded logo, behind content ───────────────────────────
 function Watermark() {
