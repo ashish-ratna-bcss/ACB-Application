@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import DocumentViewerModal from '../components/DocumentViewerModal';
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8000';
 
@@ -73,8 +72,9 @@ export default function DocumentProcessorPage() {
   const [logs, setLogs] = useState([]);
   const [stageProgress, setStageProgress] = useState({});
   const [apiMsg, setApiMsg] = useState('');
-  const [viewerOpen, setViewerOpen] = useState(false);
-  const [selectedDocument, setSelectedDocument] = useState(null);
+  const [viewingDocument, setViewingDocument] = useState(null);
+  const [viewingDocumentContent, setViewingDocumentContent] = useState(null);
+  const [viewingDocLoading, setViewingDocLoading] = useState(false);
 
   const fileInputRef = useRef(null);
   const xhrRef = useRef(null);
@@ -138,6 +138,22 @@ export default function DocumentProcessorPage() {
       setDocsLoading(false);
     }
   }, []);
+
+  const viewDocument = useCallback(async (doc) => {
+    setViewingDocument(doc);
+    setViewingDocLoading(true);
+    setViewingDocumentContent(null);
+    try {
+      const res = await fetch(`${BACKEND_URL}/api/pdf/document/${encodeURIComponent(selectedCase)}/${encodeURIComponent(doc.document_id || doc.file_name)}`);
+      if (!res.ok) throw new Error('Failed to fetch');
+      const data = await res.json();
+      setViewingDocumentContent(data);
+    } catch (_) {
+      setViewingDocumentContent(null);
+    } finally {
+      setViewingDocLoading(false);
+    }
+  }, [selectedCase]);
 
   const getStageStatus = useCallback(
     (stageKey) => {
@@ -343,15 +359,7 @@ export default function DocumentProcessorPage() {
   };
 
   return (
-    <>
-      <DocumentViewerModal
-        isOpen={viewerOpen}
-        onClose={() => setViewerOpen(false)}
-        document={selectedDocument}
-        caseId={selectedCase}
-        CASE_PHASES={CASE_PHASES}
-      />
-      <div style={{ maxWidth: '1400px', margin: '0 auto', display: 'grid', gap: '14px' }}>
+    <div style={{ maxWidth: '1400px', margin: '0 auto', display: 'grid', gap: '14px' }}>
       <div style={hero}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
           <span style={{ fontSize: '18px' }}>📄</span>
@@ -490,7 +498,7 @@ export default function DocumentProcessorPage() {
                   {selectedCaseDocs.map((doc) => {
                     const phaseLabel = doc.phase ? CASE_PHASES.find((p) => p.key === doc.phase)?.label || doc.phase : 'No phase';
                     return (
-                    <div key={doc.document_id} style={{ ...docRow, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', cursor: 'pointer', transition: 'all 0.2s' }} onClick={() => { setSelectedDocument(doc); setViewerOpen(true); }}>
+                    <div key={doc.document_id} style={{ ...docRow, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', cursor: 'pointer', transition: 'all 0.2s', background: viewingDocument?.document_id === doc.document_id ? 'rgba(37,99,235,0.08)' : 'var(--surface-2)' }} onClick={() => viewDocument(doc)}>
                       <div style={{ minWidth: 0, flex: 1 }}>
                         <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                           {doc.original_name || doc.file_name}
@@ -567,7 +575,67 @@ export default function DocumentProcessorPage() {
         </div>
 
         <div style={card}>
-          {uiStage === 'idle' && (
+          {uiStage === 'idle' && viewingDocument && (
+            <div style={{ display: 'grid', gap: '10px', maxHeight: '750px', overflow: 'auto' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px' }}>
+                <h3 style={h3}>{viewingDocument.original_name || viewingDocument.file_name}</h3>
+                <button onClick={() => { setViewingDocument(null); setViewingDocumentContent(null); }} style={{ background: 'none', border: 'none', color: 'var(--text-3)', fontSize: '16px', cursor: 'pointer' }}>✕</button>
+              </div>
+              <div style={{ fontSize: '11px', display: 'flex', gap: '8px', alignItems: 'center' }}>
+                <span style={{ color: 'var(--text-3)' }}>{viewingDocument.status}</span>
+                {viewingDocument.total_pages > 0 && <span style={{ color: 'var(--text-3)' }}>{viewingDocument.total_pages} pages</span>}
+                <span style={{ display: 'inline-block', padding: '2px 8px', borderRadius: '999px', fontWeight: 700, background: 'rgba(37,99,235,0.12)', color: '#1D4ED8' }}>
+                  {viewingDocument.phase ? CASE_PHASES.find((p) => p.key === viewingDocument.phase)?.label || viewingDocument.phase : 'No phase'}
+                </span>
+              </div>
+
+              {viewingDocument.file_name && (
+                <div style={{ marginTop: '12px' }}>
+                  <a href={`${BACKEND_URL}/api/pdf/file/${encodeURIComponent(selectedCase)}/${encodeURIComponent(viewingDocument.file_name)}`} target="_blank" rel="noopener noreferrer" style={{ ...primaryBtn, textDecoration: 'none', display: 'block', textAlign: 'center' }}>
+                    View Original PDF
+                  </a>
+                </div>
+              )}
+
+              {viewingDocLoading && <div style={muted}>Loading extracted content...</div>}
+
+              {viewingDocumentContent && !viewingDocLoading && (
+                <div style={{ display: 'grid', gap: '16px' }}>
+                  {viewingDocumentContent.pages && viewingDocumentContent.pages.length > 0 && (
+                    <div>
+                      <div style={{ fontSize: '12px', fontWeight: 700, marginBottom: '8px' }}>Extracted Content</div>
+                      <div style={{ display: 'grid', gap: '8px' }}>
+                        {viewingDocumentContent.pages.map((page, idx) => (
+                          <div key={idx} style={{ ...docRow, padding: '10px' }}>
+                            <div style={{ fontSize: '10px', fontWeight: 700, color: 'var(--text-3)', marginBottom: '4px' }}>Page {page.page_number}</div>
+                            <div style={{ fontSize: '11px', lineHeight: 1.4, color: 'var(--text)' }}>{page.page_text || 'No text'}</div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {viewingDocumentContent.subdocuments && viewingDocumentContent.subdocuments.length > 0 && (
+                    <div>
+                      <div style={{ fontSize: '12px', fontWeight: 700, marginBottom: '8px' }}>Detected Documents</div>
+                      <div style={{ display: 'grid', gap: '6px' }}>
+                        {viewingDocumentContent.subdocuments.map((subdoc, idx) => (
+                          <div key={idx} style={docRow}>
+                            <div style={{ fontSize: '11px', fontWeight: 700 }}>{idx + 1}. {subdoc.title}</div>
+                            <div style={{ fontSize: '10px', color: 'var(--text-3)', marginTop: '2px' }}>
+                              {subdoc.document_type} · Pages {subdoc.start_page}-{subdoc.end_page}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
+          {uiStage === 'idle' && !viewingDocument && (
             <div style={{ display: 'grid', gap: '10px' }}>
               <h3 style={{ ...h3, marginBottom: 0 }}>Processing Pipeline</h3>
               <div style={muted}>
@@ -713,8 +781,7 @@ export default function DocumentProcessorPage() {
           )}
         </div>
       </div>
-      </div>
-    </>
+    </div>
   );
 }
 
