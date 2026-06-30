@@ -21,7 +21,14 @@
       "Bash(npx tsc *)",
       "Bash(node -c src/pages/DocumentProcessorPage.js)",
       "Bash(node -c /home/ashish-ratna/ACB/ACB/acb-demo-application/src/pages/DocumentProcessorPage.js)",
-      "Bash(pkill -f \"npm start\\\\|node\")"
+      "Bash(pkill -f \"npm start\\\\|node\")",
+      "Bash(sqlite3 backend/acb_documents.db \"SELECT COUNT\\(*\\) as page_count FROM page_content WHERE document_id IN \\(SELECT id FROM document WHERE case_id='case-765aa2f3'\\);\")",
+      "Bash(python3 -c ' *)",
+      "Bash(curl -s \"http://localhost:8000/api/pdf/document/case-765aa2f3/11\")",
+      "Bash(python3 -m json.tool)",
+      "Bash(curl -s \"http://localhost:8000/api/pdf/document/case-765aa2f3/10\")",
+      "Bash(curl -s \"http://localhost:8000/api/pdf/document/case-765aa2f3/34%20RCT%20NMD%20%202004.1_20260630_105159_2cfcc334.pdf\")",
+      "Bash(curl -s \"http://localhost:8000/api/pdf/pages/11\")"
     ]
   }
 }

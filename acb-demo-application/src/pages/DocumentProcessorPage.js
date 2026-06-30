@@ -155,11 +155,16 @@ export default function DocumentProcessorPage() {
     setPdfViewerOpen(true);
 
     try {
-      const res = await fetch(`${BACKEND_URL}/api/pdf/document/${encodeURIComponent(selectedCase)}/${encodeURIComponent(doc.document_id || doc.file_name)}`);
-      if (!res.ok) throw new Error('Failed to fetch');
+      const docId = doc.id || doc.document_id;
+      const fetchUrl = `${BACKEND_URL}/api/pdf/document/${encodeURIComponent(selectedCase)}/${encodeURIComponent(docId)}`;
+      console.log('Fetching extracted content:', fetchUrl);
+      const res = await fetch(fetchUrl);
+      if (!res.ok) throw new Error(`Failed to fetch: ${res.status}`);
       const data = await res.json();
+      console.log('Extracted content loaded:', data);
       setViewingDocumentContent(data);
-    } catch (_) {
+    } catch (err) {
+      console.error('Error fetching extracted content:', err);
       setViewingDocumentContent(null);
     } finally {
       setViewingDocLoading(false);
@@ -576,23 +581,7 @@ export default function DocumentProcessorPage() {
 
         <div style={{ display: 'grid', gap: '14px', gridTemplateRows: 'auto auto' }}>
           {uiStage === 'idle' && viewingDocument && (
-            <>
-              <div style={{ ...card, padding: '16px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
-                  <div>
-                    <h3 style={{ ...h3, margin: 0 }}>{viewingDocument.original_name || viewingDocument.file_name}</h3>
-                    <div style={{ fontSize: '11px', display: 'flex', gap: '8px', alignItems: 'center', marginTop: '6px' }}>
-                      <span style={{ color: 'var(--text-3)' }}>{viewingDocument.status}</span>
-                      {viewingDocument.total_pages > 0 && <span style={{ color: 'var(--text-3)' }}>{viewingDocument.total_pages} pages</span>}
-                      <span style={{ display: 'inline-block', padding: '2px 8px', borderRadius: '999px', fontWeight: 700, background: 'rgba(37,99,235,0.12)', color: '#1D4ED8' }}>
-                        {viewingDocument.phase ? CASE_PHASES.find((p) => p.key === viewingDocument.phase)?.label || viewingDocument.phase : 'No phase'}
-                      </span>
-                    </div>
-                  </div>
-                  <button onClick={() => { setViewingDocument(null); setViewingDocumentContent(null); }} style={{ background: 'none', border: 'none', color: 'var(--text-3)', fontSize: '16px', cursor: 'pointer', flexShrink: 0 }}>✕</button>
-                </div>
-              </div>
-
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
               <div style={{ ...card, height: '350px', padding: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
               {pdfViewerOpen ? (
                 <>
@@ -666,7 +655,7 @@ export default function DocumentProcessorPage() {
                 )}
               </div>
             )}
-            </>
+            </div>
           )}
 
           {uiStage === 'idle' && !viewingDocument && (

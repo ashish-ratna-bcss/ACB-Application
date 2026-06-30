@@ -47,6 +47,51 @@ function deriveTranscript(result) {
     .join(' ');
 }
 
+function SpeakerComboBox({ value, onChange, options, placeholder }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+  const filtered = options.filter((o) => !value || o.toLowerCase().includes(value.toLowerCase()));
+
+  useEffect(() => {
+    const handler = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  return (
+    <div ref={ref} style={{ position: 'relative' }}>
+      <div style={{ display: 'flex', alignItems: 'center', border: '1px solid var(--border)', borderRadius: '8px', background: 'var(--bg-2)', overflow: 'hidden' }}>
+        <input
+          type="text"
+          value={value}
+          onChange={(e) => { onChange(e.target.value); setOpen(true); }}
+          onFocus={() => setOpen(true)}
+          placeholder={placeholder || 'Select or type…'}
+          style={{ flex: 1, fontSize: '12px', padding: '5px 8px', border: 'none', background: 'transparent', color: 'var(--text)', outline: 'none', minWidth: 0, width: '120px' }}
+        />
+        {value ? (
+          <button type="button" onClick={() => { onChange(''); setOpen(false); }}
+            style={{ border: 'none', background: 'none', color: 'var(--text-3)', cursor: 'pointer', padding: '0 6px', fontSize: '14px', lineHeight: 1 }}>×</button>
+        ) : (
+          <button type="button" onClick={() => setOpen((p) => !p)}
+            style={{ border: 'none', background: 'none', color: 'var(--text-3)', cursor: 'pointer', padding: '0 6px', fontSize: '10px' }}>▾</button>
+        )}
+      </div>
+      {open && filtered.length > 0 && (
+        <div style={{ position: 'absolute', top: 'calc(100% + 4px)', left: 0, zIndex: 999, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '10px', boxShadow: 'var(--shadow)', minWidth: '160px', overflow: 'hidden' }}>
+          {filtered.map((opt) => (
+            <button key={opt} type="button"
+              onMouseDown={(e) => { e.preventDefault(); onChange(opt); setOpen(false); }}
+              style={{ display: 'block', width: '100%', textAlign: 'left', padding: '8px 12px', fontSize: '12px', fontWeight: 600, color: value === opt ? 'var(--text)' : 'var(--text-2)', background: value === opt ? 'var(--surface-2)' : 'transparent', border: 'none', cursor: 'pointer' }}>
+              {opt}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function SpeechIntelligencePage() {
   const [cases, setCases] = useState([]);
   const [selectedCaseId, setSelectedCaseId] = useState('');
@@ -117,6 +162,11 @@ export default function SpeechIntelligencePage() {
   const rows = result?.conversation_table?.rows || [];
   const transcriptText = useMemo(() => deriveTranscript(result), [result]);
 
+  const uniqueSpeakers = useMemo(() => [...new Set(rows.map((r) => r.person).filter(Boolean))], [rows]);
+  const [speakerNames, setSpeakerNames] = useState({});
+  useEffect(() => { setSpeakerNames({}); }, [result]);
+  const resolveName = (person) => speakerNames[person]?.trim() || person;
+
   const stopStream = useCallback(() => {
     streamRef.current?.getTracks().forEach((track) => track.stop());
     streamRef.current = null;
@@ -131,13 +181,33 @@ export default function SpeechIntelligencePage() {
 
   const loadHistory = useCallback(() => {
     if (!selectedCaseId) { setHistory([]); return; }
-    fetch(`${BACKEND_URL}/media-records?case_id=${encodeURIComponent(selectedCaseId)}`)
+    fetch(`${BACKEND_URL}/api/media-records?case_id=${encodeURIComponent(selectedCaseId)}`)
       .then((r) => r.json())
       .then((d) => setHistory(Array.isArray(d) ? d : []))
       .catch(() => setHistory([]));
   }, [selectedCaseId]);
 
   useEffect(() => { loadHistory(); }, [loadHistory]);
+
+  const [casePersons, setCasePersons] = useState([]);
+  useEffect(() => {
+    if (!selectedCaseId) { setCasePersons([]); return; }
+    const found = cases.find((c) => c.id === selectedCaseId);
+    const fromCase = [found?.accusedName, found?.officerName].filter(Boolean);
+    fetch(`${BACKEND_URL}/api/complaints?case_id=${encodeURIComponent(selectedCaseId)}`)
+      .then((r) => r.json())
+      .then((d) => {
+        const complaint = Array.isArray(d) ? d[0] : d;
+        const names = [...new Set([
+          complaint?.complainantName,
+          complaint?.accusedName,
+          complaint?.dspName,
+          ...fromCase,
+        ].filter(Boolean))];
+        setCasePersons(names);
+      })
+      .catch(() => setCasePersons(fromCase));
+  }, [selectedCaseId, cases]);
 
   useEffect(() => {
     let cancelled = false;
@@ -340,7 +410,7 @@ export default function SpeechIntelligencePage() {
         externalCaseId: ref?.caseId || null,
         externalFileId: ref?.fileId || null,
       };
-      const res = await fetch(`${BACKEND_URL}/media-records`, {
+      const res = await fetch(`${BACKEND_URL}/api/media-records`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
@@ -591,14 +661,27 @@ export default function SpeechIntelligencePage() {
                   <div style={warnBox}>No speech detected in this media — transcript and conversation table are empty.</div>
                 ) : null}
 
-                {transcriptText ? (
-                  <Collapsible title="Transcript" open={open.transcript} onToggle={() => toggle('transcript')} scroll>
-                    <p style={contentText}>{transcriptText}</p>
-                  </Collapsible>
-                ) : null}
-
                 {rows.length ? (
                   <Collapsible title="Conversation Table" count={rows.length} open={open.table} onToggle={() => toggle('table')} scroll>
+                    {uniqueSpeakers.length > 0 && (
+                      <div style={{ padding: '10px 0 14px', borderBottom: '1px solid var(--border)', marginBottom: '12px' }}>
+                        <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '8px' }}>Assign Speaker Names</div>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
+                          {uniqueSpeakers.map((spk) => (
+                            <div key={spk} style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: '10px', padding: '6px 10px' }}>
+                              <span style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text-2)', whiteSpace: 'nowrap' }}>{spk}</span>
+                              <span style={{ fontSize: '12px', color: 'var(--text-3)' }}>→</span>
+                              <SpeakerComboBox
+                                value={speakerNames[spk] || ''}
+                                onChange={(v) => setSpeakerNames((p) => ({ ...p, [spk]: v }))}
+                                options={casePersons}
+                                placeholder="Assign name…"
+                              />
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                     <div style={{ overflowX: 'auto' }}>
                       <table style={table}>
                         <thead>
@@ -614,13 +697,19 @@ export default function SpeechIntelligencePage() {
                             <tr key={i}>
                               <td style={td}>{r.sl ?? i + 1}</td>
                               <td style={{ ...td, whiteSpace: 'nowrap' }}>{r.time || ''}</td>
-                              <td style={{ ...td, fontWeight: 700 }}>{r.person || ''}</td>
+                              <td style={{ ...td, fontWeight: 700 }}>{resolveName(r.person || '')}</td>
                               <td style={td}>{r.conversation || ''}</td>
                             </tr>
                           ))}
                         </tbody>
                       </table>
                     </div>
+                  </Collapsible>
+                ) : null}
+
+                {transcriptText ? (
+                  <Collapsible title="Transcript" open={open.transcript} onToggle={() => toggle('transcript')} scroll>
+                    <p style={contentText}>{transcriptText}</p>
                   </Collapsible>
                 ) : null}
 

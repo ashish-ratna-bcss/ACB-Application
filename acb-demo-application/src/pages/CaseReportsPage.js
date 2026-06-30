@@ -264,7 +264,7 @@ export default function CaseReportsPage() {
   function refreshMedia() {
     if (!selectedCase) return;
     setMediaRecordsLoading(true);
-    fetch(`${BACKEND_URL}/media-records?case_id=${encodeURIComponent(selectedCase)}`)
+    fetch(`${BACKEND_URL}/api/media-records?case_id=${encodeURIComponent(selectedCase)}`)
       .then((r) => r.json())
       .then((d) => setMediaRecords(Array.isArray(d) ? d : []))
       .catch(() => setMediaRecords([]))
@@ -293,7 +293,7 @@ export default function CaseReportsPage() {
       })
       .catch(() => {});
     setMediaRecordsLoading(true);
-    fetch(`${BACKEND_URL}/media-records?case_id=${encodeURIComponent(caseId)}`)
+    fetch(`${BACKEND_URL}/api/media-records?case_id=${encodeURIComponent(caseId)}`)
       .then((r) => r.json())
       .then((d) => setMediaRecords(Array.isArray(d) ? d : []))
       .catch(() => setMediaRecords([]))

@@ -250,6 +250,55 @@ def get_document_pages(document_id: int):
         db.close()
 
 
+# ── Document Content (Pages + Subdocuments) ──────────────────────────────────
+
+@router.get("/document/{case_id}/{document_id_or_name}", summary="Get extracted content (pages + subdocuments) for a document")
+def get_document_content(case_id: str, document_id_or_name: str):
+    from app.models import PageContent
+    db: Session = SessionLocal()
+    try:
+        doc = None
+        try:
+            doc_id = int(document_id_or_name)
+            doc = db.query(Document).filter(Document.id == doc_id, Document.case_id == case_id).first()
+        except ValueError:
+            doc = db.query(Document).filter(Document.file_name == document_id_or_name, Document.case_id == case_id).first()
+
+        if not doc:
+            raise HTTPException(status_code=404, detail="Document not found")
+
+        pages = db.query(PageContent).filter(PageContent.document_id == doc.id).order_by(PageContent.page_number).all()
+
+        subdocs = db.query(SubDocument).filter(SubDocument.document_id == doc.id).order_by(SubDocument.start_page).all()
+        subdoc_list = []
+        for sd in subdocs:
+            content = db.query(SubDocumentContent).filter(SubDocumentContent.sub_document_id == sd.id).first()
+            subdoc_list.append({
+                "id": sd.id,
+                "title": sd.title,
+                "document_type": sd.document_type,
+                "start_page": sd.start_page,
+                "end_page": sd.end_page,
+                "confidence_score": sd.confidence_score,
+                "content": {
+                    "subject": content.subject if content else None,
+                    "summary": content.summary if content else None,
+                } if content else None,
+            })
+
+        return {
+            "document_id": doc.id,
+            "case_id": case_id,
+            "file_name": doc.file_name,
+            "status": doc.status,
+            "total_pages": doc.total_pages,
+            "pages": [{"page_number": p.page_number, "page_text": p.page_text} for p in pages],
+            "subdocuments": subdoc_list,
+        }
+    finally:
+        db.close()
+
+
 class SavePagesRequest(BaseModel):
     pages: list[dict]  # [{"page_number": int, "page_text": str}]
 
