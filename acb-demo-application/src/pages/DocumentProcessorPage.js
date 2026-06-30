@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import DocumentSidePanel from '../components/DocumentSidePanel';
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8000';
 
@@ -79,6 +78,7 @@ export default function DocumentProcessorPage() {
   const [pdfViewerOpen, setPdfViewerOpen] = useState(false);
   const [pdfViewerUrl, setPdfViewerUrl] = useState(null);
   const [pdfViewerFileName, setPdfViewerFileName] = useState(null);
+  const [iframeLoaded, setIframeLoaded] = useState(false);
 
   const fileInputRef = useRef(null);
   const xhrRef = useRef(null);
@@ -188,6 +188,10 @@ export default function DocumentProcessorPage() {
   }, []);
 
   useEffect(() => () => stopPolling(), [stopPolling]);
+
+  useEffect(() => {
+    setIframeLoaded(false);
+  }, [pdfViewerUrl]);
 
   useEffect(() => {
     const onClickOutside = (event) => {
@@ -570,26 +574,66 @@ export default function DocumentProcessorPage() {
           )}
         </div>
 
-        <div style={card}>
+        <div style={{ display: 'grid', gap: '14px', gridTemplateRows: 'auto auto' }}>
+          {/* Document Viewer Section */}
           {uiStage === 'idle' && viewingDocument && (
-            <div style={{ display: 'grid', gap: '10px', maxHeight: '750px', overflow: 'auto' }}>
+            <div style={{ ...card, display: 'grid', gridTemplateRows: 'auto 1fr', gap: 0 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px' }}>
-                <h3 style={h3}>{viewingDocument.original_name || viewingDocument.file_name}</h3>
-                <button onClick={() => { setViewingDocument(null); setViewingDocumentContent(null); }} style={{ background: 'none', border: 'none', color: 'var(--text-3)', fontSize: '16px', cursor: 'pointer' }}>✕</button>
+                <div>
+                  <h3 style={{ ...h3, margin: 0 }}>{viewingDocument.original_name || viewingDocument.file_name}</h3>
+                  <div style={{ fontSize: '11px', display: 'flex', gap: '8px', alignItems: 'center', marginTop: '6px' }}>
+                    <span style={{ color: 'var(--text-3)' }}>{viewingDocument.status}</span>
+                    {viewingDocument.total_pages > 0 && <span style={{ color: 'var(--text-3)' }}>{viewingDocument.total_pages} pages</span>}
+                    <span style={{ display: 'inline-block', padding: '2px 8px', borderRadius: '999px', fontWeight: 700, background: 'rgba(37,99,235,0.12)', color: '#1D4ED8' }}>
+                      {viewingDocument.phase ? CASE_PHASES.find((p) => p.key === viewingDocument.phase)?.label || viewingDocument.phase : 'No phase'}
+                    </span>
+                  </div>
+                </div>
+                <button onClick={() => { setViewingDocument(null); setViewingDocumentContent(null); }} style={{ background: 'none', border: 'none', color: 'var(--text-3)', fontSize: '16px', cursor: 'pointer', flexShrink: 0 }}>✕</button>
               </div>
-              <div style={{ fontSize: '11px', display: 'flex', gap: '8px', alignItems: 'center' }}>
-                <span style={{ color: 'var(--text-3)' }}>{viewingDocument.status}</span>
-                {viewingDocument.total_pages > 0 && <span style={{ color: 'var(--text-3)' }}>{viewingDocument.total_pages} pages</span>}
-                <span style={{ display: 'inline-block', padding: '2px 8px', borderRadius: '999px', fontWeight: 700, background: 'rgba(37,99,235,0.12)', color: '#1D4ED8' }}>
-                  {viewingDocument.phase ? CASE_PHASES.find((p) => p.key === viewingDocument.phase)?.label || viewingDocument.phase : 'No phase'}
-                </span>
-              </div>
+            </div>
 
+            {/* Viewer Container - White Box */}
+            <div style={{ ...card, height: '350px', padding: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+              {pdfViewerOpen ? (
+                <>
+                  {!iframeLoaded && (
+                    <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-3)' }}>
+                      <div style={{ textAlign: 'center' }}>
+                        <div style={{ width: '40px', height: '40px', border: '3px solid var(--border)', borderTop: '3px solid #2563EB', borderRadius: '50%', animation: 'spin 0.8s linear infinite', margin: '0 auto 12px' }} />
+                        <div style={{ fontSize: '12px' }}>Loading PDF...</div>
+                        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+                      </div>
+                    </div>
+                  )}
+                  <iframe
+                    src={pdfViewerUrl}
+                    style={{
+                      flex: 1,
+                      border: 'none',
+                      opacity: iframeLoaded ? 1 : 0.5,
+                    }}
+                    title="PDF Viewer"
+                    onLoad={() => setIframeLoaded(true)}
+                  />
+                </>
+              ) : (
+                <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-3)' }}>
+                  <div style={{ textAlign: 'center' }}>
+                    <div style={{ fontSize: '48px', marginBottom: '8px' }}>📄</div>
+                    <div style={{ fontSize: '12px' }}>Click document to view</div>
+                  </div>
+                </div>
+              )}
+            </div>
 
-              {viewingDocLoading && <div style={muted}>Loading extracted content...</div>}
+            {/* Extracted Content Section - Orange Box */}
+            {(viewingDocLoading || (viewingDocumentContent && !viewingDocLoading)) && (
+              <div style={{ ...card, background: 'rgba(255, 140, 0, 0.05)', borderColor: 'rgba(255, 140, 0, 0.3)', maxHeight: '400px', overflow: 'auto' }}>
+                {viewingDocLoading && <div style={muted}>Loading extracted content...</div>}
 
-              {viewingDocumentContent && !viewingDocLoading && (
-                <div style={{ display: 'grid', gap: '16px' }}>
+                {viewingDocumentContent && !viewingDocLoading && (
+                  <div style={{ display: 'grid', gap: '16px' }}>
                   {viewingDocumentContent.pages && viewingDocumentContent.pages.length > 0 && (
                     <div>
                       <div style={{ fontSize: '12px', fontWeight: 700, marginBottom: '8px' }}>Extracted Content</div>
@@ -619,9 +663,10 @@ export default function DocumentProcessorPage() {
                       </div>
                     </div>
                   )}
-                </div>
-              )}
-            </div>
+                  </div>
+                )}
+              </div>
+            )}
           )}
 
           {uiStage === 'idle' && !viewingDocument && (
@@ -770,13 +815,6 @@ export default function DocumentProcessorPage() {
           )}
         </div>
       </div>
-      <DocumentSidePanel
-        isOpen={pdfViewerOpen}
-        onClose={() => setPdfViewerOpen(false)}
-        pdfUrl={pdfViewerUrl}
-        fileName={pdfViewerFileName}
-        document={viewingDocument}
-      />
     </div>
   );
 }
