@@ -3,42 +3,8 @@ import ssl
 import urllib.request
 import warnings
 
-# Required for PaddleOCR compatibility when protobuf >= 4.x is installed
-# (pyannote.audio pulls in opentelemetry which needs protobuf 6.x;
-#  PaddlePaddle's generated _pb2 files only work with pure-Python impl)
+# Compatibility patch for pyannote.audio with protobuf >= 4.x
 os.environ.setdefault("PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION", "python")
-
-# ── SSL bypass for PaddleOCR model downloads from Baidu CDN ──────────────────
-# PaddleOCR uses `requests` (urllib3) internally — the standard ssl patch alone
-# does not help. Must patch all three layers.
-
-# 1. urllib ssl context
-ssl._create_default_https_context = ssl._create_unverified_context
-os.environ["PYTHONHTTPSVERIFY"] = "0"
-
-# 2. urllib opener (urlretrieve path)
-_ctx = ssl.create_default_context()
-_ctx.check_hostname = False
-_ctx.verify_mode = ssl.CERT_NONE
-urllib.request.install_opener(
-    urllib.request.build_opener(urllib.request.HTTPSHandler(context=_ctx))
-)
-
-# 3. requests / urllib3 (PaddleOCR download_with_progressbar uses requests.get)
-try:
-    import requests
-    import urllib3
-    warnings.filterwarnings("ignore", category=urllib3.exceptions.InsecureRequestWarning)
-    urllib3.disable_warnings()
-    _orig_request = requests.Session.request
-
-    def _request_no_verify(self, method, url, **kwargs):
-        kwargs.setdefault("verify", False)
-        return _orig_request(self, method, url, **kwargs)
-
-    requests.Session.request = _request_no_verify
-except ImportError:
-    pass
 
 import json
 from contextlib import asynccontextmanager
@@ -241,17 +207,17 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.include_router(cases_router.router)
-app.include_router(complaints_router.router)
-app.include_router(workflow_router.router)
-app.include_router(dashboard_router.router)
-app.include_router(settings_router.router)
-app.include_router(report_templates_router.router)
-app.include_router(media_records_router.router)
-app.include_router(pdf.router)
-app.include_router(stt.router)
-app.include_router(speech_intel_router.router)
-app.include_router(evidence_router.router)
+app.include_router(cases_router.router, prefix="/api")
+app.include_router(complaints_router.router, prefix="/api")
+app.include_router(workflow_router.router, prefix="/api")
+app.include_router(dashboard_router.router, prefix="/api")
+app.include_router(settings_router.router, prefix="/api")
+app.include_router(report_templates_router.router, prefix="/api")
+app.include_router(media_records_router.router, prefix="/api")
+app.include_router(pdf.router, prefix="/api")
+app.include_router(stt.router, prefix="/api")
+app.include_router(speech_intel_router.router, prefix="/api")
+app.include_router(evidence_router.router, prefix="/api")
 
 
 @app.get("/", tags=["Health"])

@@ -1,0 +1,56 @@
+version: '3.8'
+
+services:
+  acb-api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: acb-api
+    restart: unless-stopped
+    env_file:
+      - ./backend/.env
+    environment:
+      DATABASE_URL: "sqlite:///app/acb_documents.db"
+    volumes:
+      - acb-data:/app
+    expose:
+      - "8000"
+    networks:
+      - app_default
+    depends_on:
+      - acb-qdrant
+
+  acb-qdrant:
+    image: qdrant/qdrant:latest
+    container_name: acb-qdrant
+    restart: unless-stopped
+    ports:
+      - "6333:6333"
+    volumes:
+      - qdrant-storage:/qdrant/storage
+    environment:
+      QDRANT_API_KEY: "qdrant-secret-key"
+    networks:
+      - app_default
+
+  acb-frontend:
+    build:
+      context: ./acb-demo-application
+      dockerfile: Dockerfile
+      args:
+        REACT_APP_BACKEND_URL: "http://acb-api:8000"
+    container_name: acb-frontend
+    restart: unless-stopped
+    expose:
+      - "3000"
+    networks:
+      - app_default
+
+volumes:
+  acb-data:
+  qdrant-storage:
+
+networks:
+  app_default:
+    name: app_default
+    external: true

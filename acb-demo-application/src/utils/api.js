@@ -1,7 +1,8 @@
 export const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8000';
 
 async function request(path, options = {}) {
-  const res = await fetch(`${BACKEND_URL}${path}`, {
+  const apiPath = path.startsWith('/api') ? path : `/api${path}`;
+  const res = await fetch(`${BACKEND_URL}${apiPath}`, {
     headers: { 'Content-Type': 'application/json', ...(options.headers || {}) },
     ...options,
   });
@@ -35,8 +36,20 @@ export const api = {
     const q = viewPhase ? `?viewPhase=${encodeURIComponent(viewPhase)}` : '';
     return request(`/workflow/cases/${encodeURIComponent(caseId)}${q}`);
   },
-  transitionCase: (caseId, body) =>
-    request(`/workflow/cases/${encodeURIComponent(caseId)}/transition`, { method: 'POST', body: JSON.stringify(body) }),
+  transitionCase: (caseId, body, actor = {}) => {
+    try {
+      const raw = sessionStorage.getItem('acb_user');
+      const user = raw ? JSON.parse(raw) : {};
+      const actorPayload = {
+        actorId: actor.actorId || user.actorId || 'io-001',
+        actorName: actor.actorName || user.name || 'Insp. D. Prakash Reddy',
+        actorRole: actor.actorRole || user.role || 'io',
+      };
+      return request(`/workflow/cases/${encodeURIComponent(caseId)}/transition`, { method: 'POST', body: JSON.stringify({ ...body, ...actorPayload }) });
+    } catch {
+      return request(`/workflow/cases/${encodeURIComponent(caseId)}/transition`, { method: 'POST', body: JSON.stringify(body) });
+    }
+  },
   updateCheckpoint: (caseId, body) =>
     request(`/workflow/cases/${encodeURIComponent(caseId)}/checkpoints`, { method: 'PATCH', body: JSON.stringify(body) }),
   patchPhaseData: (caseId, body) =>
@@ -64,4 +77,13 @@ export const api = {
   getMediaRecords: (caseId) => request(`/media-records?case_id=${encodeURIComponent(caseId)}`),
   addFurtherComplaint: (caseId, body) =>
     request(`/complaints/by-case/${encodeURIComponent(caseId)}/further`, { method: 'POST', body: JSON.stringify(body) }),
+  checkMediaRecords: (caseId) => request(`/media-records/case/${encodeURIComponent(caseId)}/check`),
+  draftVerificationReport: (caseId) => request(`/media-records/${encodeURIComponent(caseId)}/draft-report`, { method: 'POST' }),
+  draftVerbatimReport: (caseId) => request(`/media-records/${encodeURIComponent(caseId)}/draft-verbatim`, { method: 'POST' }),
+  draftVerificationReportStep: (caseId) => request(`/media-records/${encodeURIComponent(caseId)}/draft-verification`, { method: 'POST' }),
+  saveReport: (caseId, reportId, content) =>
+    request(`/media-records/${encodeURIComponent(caseId)}/save-report`, {
+      method: 'PATCH',
+      body: JSON.stringify({ report_id: reportId, content }),
+    }),
 };

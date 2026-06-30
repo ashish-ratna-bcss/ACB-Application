@@ -11,8 +11,6 @@ pydantic
 pdf2image
 Pillow
 
-paddleocr
-
 requests
 
 ollama

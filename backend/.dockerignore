@@ -1,0 +1,41 @@
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.Python
+venv/
+env/
+.venv
+.env
+.env.local
+
+# Debug/test scripts
+debug_*.py
+test_*.py
+check_*.py
+migrate_*.py
+rerun_*.py
+cleanup_*.py
+analyze_*.py
+
+# Database
+*.db
+*.db-shm
+*.db-wal
+
+# Logs
+*.log
+qdrant.log
+
+# Storage (rebuilt on startup)
+storage/
+qdrant-storage/
+
+# Git
+.git
+.gitignore
+
+# Local testing
+.pytest_cache
+.coverage
+htmlcov

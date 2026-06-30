@@ -11,7 +11,6 @@ from app.models import (
 from app.services.ai_content_extraction import extract_content
 from app.services.ai_subdoc_detection import detect_subdocuments
 from app.services.evidence_extractor import extract_all_evidence, serialize_evidence
-from app.services.ocr import extract_ocr_blocks
 from app.services.page_parser import reconstruct_page_text
 from app.services.pdf_to_images import convert_pdf_to_images, delete_page_images
 from app.services.progress_store import clear_progress, set_stage_progress
@@ -131,17 +130,26 @@ def run_pipeline(document_id: int, case_id: str, file_name: str, start_stage: st
         if start_idx <= STAGES_LIST.index(STAGE_OCR):
             _stage(db, doc, "processing", STAGE_OCR)
             set_stage_progress(document_id, STAGE_OCR, 0, total_pages, "pages")
-            logger.info(f"[doc={document_id}] Running OCR on {total_pages} pages")
+            logger.info(f"[doc={document_id}] Running remote OCR on {total_pages} pages")
 
+            from app.config import PDF_UPLOAD_DIR
+            from app.services.ocr import run_remote_ocr, make_mock_ocr_blocks
+            
+            pdf_path = PDF_UPLOAD_DIR / case_id / file_name
+            
+            def progress_callback(done, total):
+                set_stage_progress(document_id, STAGE_OCR, done, total, "pages")
+                
+            # Run remote OCR job on the entire PDF
+            pages_text = run_remote_ocr(pdf_path, document_id, progress_callback)
+            
             page_texts_raw = []
-            for idx, image_path in enumerate(image_paths, start=1):
-                page_num = int(image_path.stem.split("_")[1])
-                blocks = extract_ocr_blocks(image_path, page_num, document_id)
+            for page_num, text in sorted(pages_text.items()):
+                blocks = make_mock_ocr_blocks(text, page_num, document_id)
                 for b in blocks:
                     db.add(OCRBlock(**b))
                 page_texts_raw.append((page_num, blocks))
-                set_stage_progress(document_id, STAGE_OCR, idx, total_pages, "pages")
-                logger.info(f"[doc={document_id}] OCR page {idx}/{total_pages}")
+                
             db.commit()
             delete_page_images(case_id, document_id)
             _mark_stage_completed(db, document_id, STAGE_OCR)
@@ -152,6 +160,24 @@ def run_pipeline(document_id: int, case_id: str, file_name: str, start_stage: st
             _stage(db, doc, "processing", STAGE_RECONSTRUCT)
             set_stage_progress(document_id, STAGE_RECONSTRUCT, 0, total_pages, "pages")
             logger.info(f"[doc={document_id}] Reconstructing page text")
+
+            if page_texts_raw is None:
+                # Load from database
+                db_blocks = db.query(OCRBlock).filter(OCRBlock.document_id == document_id).order_by(OCRBlock.page_number, OCRBlock.y).all()
+                from collections import defaultdict
+                grouped = defaultdict(list)
+                for b in db_blocks:
+                    grouped[b.page_number].append({
+                        "document_id": b.document_id,
+                        "page_number": b.page_number,
+                        "text": b.text,
+                        "x": b.x,
+                        "y": b.y,
+                        "width": b.width,
+                        "height": b.height,
+                        "confidence": b.confidence
+                    })
+                page_texts_raw = sorted(grouped.items())
 
             reconstructed = []
             for idx, (page_num, blocks) in enumerate(page_texts_raw, start=1):
