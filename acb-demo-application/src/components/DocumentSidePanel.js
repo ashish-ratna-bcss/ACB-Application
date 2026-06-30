@@ -1,8 +1,14 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8000';
 
 export default function DocumentSidePanel({ isOpen, onClose, pdfUrl, fileName, document }) {
+  const [iframeLoaded, setIframeLoaded] = useState(false);
+
+  useEffect(() => {
+    setIframeLoaded(false);
+  }, [pdfUrl]);
+
   if (!isOpen || !pdfUrl) return null;
 
   const isDocx = fileName?.toLowerCase().endsWith('.docx');
@@ -73,17 +79,27 @@ export default function DocumentSidePanel({ isOpen, onClose, pdfUrl, fileName, d
       </div>
 
       {/* Viewer */}
-      <div style={{ flex: 1, overflow: 'hidden', background: '#f5f5f5', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <div style={{ flex: 1, overflow: 'hidden', background: '#f5f5f5', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative' }}>
         {isPdf ? (
-          <iframe
-            src={pdfUrl}
-            style={{
-              width: '100%',
-              height: '100%',
-              border: 'none',
-            }}
-            title="PDF Viewer"
-          />
+          <>
+            {!iframeLoaded && (
+              <div style={{ position: 'absolute', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px', color: 'var(--text-3)' }}>
+                <div style={{ width: '40px', height: '40px', border: '3px solid var(--border)', borderTop: '3px solid #2563EB', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+                <div style={{ fontSize: '12px' }}>Loading PDF...</div>
+                <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+              </div>
+            )}
+            <iframe
+              src={pdfUrl}
+              style={{
+                width: '100%',
+                height: '100%',
+                border: 'none',
+                opacity: iframeLoaded ? 1 : 0.5,
+              }}
+              title="PDF Viewer"
+              onLoad={() => setIframeLoaded(true)}
+            /></>
         ) : isDocx ? (
           <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-3)' }}>
             <div style={{ fontSize: '48px', marginBottom: '16px' }}>📄</div>
