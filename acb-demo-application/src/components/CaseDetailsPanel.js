@@ -55,6 +55,11 @@ export default function CaseDetailsPanel({ caseData, phase: pagePhase, onClose, 
   const [reportEditMode, setReportEditMode] = useState({});
   const [reportEdits, setReportEdits] = useState({});
   const [reportSaving, setReportSaving] = useState({});
+  const [draftingHoMemo, setDraftingHoMemo] = useState(false);
+  const [submittingHoDecision, setSubmittingHoDecision] = useState(false);
+  const [firNumberInput, setFirNumberInput] = useState('');
+  const [dspInstructing, setDspInstructing] = useState(false);
+  const [registeringFir, setRegisteringFir] = useState(false);
 
   const caseKey = caseData?.caseId || caseData?.id;
 
@@ -238,7 +243,7 @@ export default function CaseDetailsPanel({ caseData, phase: pagePhase, onClose, 
   }
 
   function getReportEditText(r) {
-    if (r.id === 'verification_report') {
+    if (r.id === 'verification_report' || r.id === 'ho_decision_memo') {
       return (r.narrativeParagraphs || []).join('\n\n');
     }
     if (r.id === 'verbatim_report') {
@@ -288,7 +293,7 @@ export default function CaseDetailsPanel({ caseData, phase: pagePhase, onClose, 
             <div>
               <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text)' }}>{r.title || r.id}</div>
               <div style={{ fontSize: '11px', color: 'var(--text-3)', marginTop: '1px' }}>
-                {r.id === 'verbatim_report' ? 'Verbatim transcription record' : 'Verification inquiry report'} · {isExpanded ? 'Click to collapse' : 'Click to view'}
+                {r.id === 'verbatim_report' ? 'Verbatim transcription record' : r.id === 'ho_decision_memo' ? 'Head Office Decision Memorandum' : 'Verification inquiry report'} · {isExpanded ? 'Click to collapse' : 'Click to view'}
               </div>
             </div>
           </button>
@@ -330,6 +335,11 @@ export default function CaseDetailsPanel({ caseData, phase: pagePhase, onClose, 
                   Editing narrative context per recording and conclusion. Dialogue tables (timestamps / speaker lines) are preserved from the original transcript.
                 </div>
               )}
+              {r.id === 'ho_decision_memo' && (
+                <div style={{ fontSize: '11px', color: 'var(--text-3)', marginBottom: '8px', fontStyle: 'italic' }}>
+                  Editing narrative paragraphs of the Head Office Decision Memo. Make sure the mandatory vocabulary from the Bag of Words remains present.
+                </div>
+              )}
               <textarea
                 value={reportEdits[r.id] || ''}
                 onChange={(e) => setReportEdits((prev) => ({ ...prev, [r.id]: e.target.value }))}
@@ -342,6 +352,70 @@ export default function CaseDetailsPanel({ caseData, phase: pagePhase, onClose, 
         )}
       </div>
     );
+  }
+
+  async function handleDraftHoMemo(decision) {
+    if (!caseKey) return;
+    setActionError('');
+    setDraftingHoMemo(true);
+    try {
+      const role = user?.role || 'ho';
+      await api.draftHoDecisionMemo(caseKey, decision, role);
+      const wf = await api.getCaseWorkflow(caseKey, pagePhase || undefined);
+      setWorkflow(wf);
+    } catch (e) {
+      setActionError(e.message);
+    } finally {
+      setDraftingHoMemo(false);
+    }
+  }
+
+  async function handleSubmitHoDecision(decision) {
+    if (!caseKey) return;
+    setActionError('');
+    setSubmittingHoDecision(true);
+    try {
+      const role = user?.role || 'ho';
+      const wf = await api.submitHoDecision(caseKey, decision, role);
+      setWorkflow(wf);
+      onWorkflowChange?.();
+    } catch (e) {
+      setActionError(e.message);
+    } finally {
+      setSubmittingHoDecision(false);
+    }
+  }
+
+  async function handleDspInstruct() {
+    if (!caseKey) return;
+    setActionError('');
+    setDspInstructing(true);
+    try {
+      const role = user?.role || 'dsp';
+      const wf = await api.dspInstructInspector(caseKey, role);
+      setWorkflow(wf);
+      onWorkflowChange?.();
+    } catch (e) {
+      setActionError(e.message);
+    } finally {
+      setDspInstructing(false);
+    }
+  }
+
+  async function handleRegisterFir() {
+    if (!caseKey || !firNumberInput.trim()) return;
+    setActionError('');
+    setRegisteringFir(true);
+    try {
+      const role = user?.role || 'io';
+      const wf = await api.registerFir(caseKey, firNumberInput.trim(), role);
+      setWorkflow(wf);
+      onWorkflowChange?.();
+    } catch (e) {
+      setActionError(e.message);
+    } finally {
+      setRegisteringFir(false);
+    }
   }
 
   async function handleAdvance() {
@@ -418,6 +492,22 @@ export default function CaseDetailsPanel({ caseData, phase: pagePhase, onClose, 
                     </>
                   ) : null}
                 </>
+              ) : activePhase === 'approval' ? (
+                workflow?.phaseSubstatus === 'fir_registered' ? (
+                  canAdvanceTo(workflow.nextPhase) ? (
+                    <button onClick={handleAdvance} style={advanceBtn}>
+                      Advance to {workflow.nextPhase.replace(/_/g, ' ')}
+                    </button>
+                  ) : (
+                    <button disabled style={lockedBtn} title={`Role '${role}' cannot advance to '${workflow.nextPhase}'`}>
+                      Not permitted · {role.toUpperCase()}
+                    </button>
+                  )
+                ) : (
+                  <button disabled style={lockedBtn} title="FIR must be registered before executing the trap operation">
+                    Advance blocked · Register FIR
+                  </button>
+                )
               ) : workflow?.nextPhase ? (
                 canAdvanceTo(workflow.nextPhase) ? (
                   <button onClick={handleAdvance} style={advanceBtn}>
@@ -507,6 +597,158 @@ export default function CaseDetailsPanel({ caseData, phase: pagePhase, onClose, 
                       .filter(Boolean)
                       .map((r) => renderReportAccordion(r, false))}
                   </>
+                )}
+
+                {activePhase === 'approval' && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                    <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '12px', padding: '20px', boxShadow: 'var(--shadow)' }}>
+                      <h3 style={{ fontSize: '15px', fontWeight: 700, margin: '0 0 10px 0', color: 'var(--text)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <span>⚖️</span> Head Office Decision & Approval Panel
+                      </h3>
+                      <p style={{ fontSize: '12.5px', color: 'var(--text-3)', margin: '0 0 15px 0', lineHeight: 1.5 }}>
+                        This panel manages the decision-making pipeline for trap execution. Only the Head Office (role: ho) can issue the decision memorandum. Once approved, the DSP notifies the team, and the Inspector registers the FIR.
+                      </p>
+
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 14px', borderRadius: '8px', background: 'var(--surface-2)', border: '1px solid var(--border)', marginBottom: '15px', fontSize: '13px' }}>
+                        <strong>Substatus:</strong> 
+                        <span style={{ 
+                          textTransform: 'uppercase', 
+                          fontSize: '11px', 
+                          fontWeight: 700, 
+                          padding: '3px 8px', 
+                          borderRadius: '12px', 
+                          background: workflow?.phaseSubstatus === 'approved' ? 'rgba(22,163,74,0.13)' : workflow?.phaseSubstatus === 'fir_registered' ? 'rgba(59,130,246,0.13)' : workflow?.phaseSubstatus === 'rejected' ? 'rgba(239,68,68,0.13)' : 'rgba(245,158,11,0.13)',
+                          color: workflow?.phaseSubstatus === 'approved' ? '#16A34A' : workflow?.phaseSubstatus === 'fir_registered' ? '#3B82F6' : workflow?.phaseSubstatus === 'rejected' ? '#EF4444' : '#F59E0B',
+                          border: `1px solid ${workflow?.phaseSubstatus === 'approved' ? '#16A34A' : workflow?.phaseSubstatus === 'fir_registered' ? '#3B82F6' : workflow?.phaseSubstatus === 'rejected' ? '#EF4444' : '#F59E0B'}`
+                        }}>
+                          {workflow?.phaseSubstatus?.replace(/_/g, ' ') || 'pending'}
+                        </span>
+                      </div>
+
+                      {/* AWAITING HO DECISION */}
+                      {(workflow?.phaseSubstatus === 'pending' || workflow?.phaseSubstatus === 'submitted') && (
+                        role === 'ho' ? (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                            <div style={{ display: 'flex', gap: '10px' }}>
+                              <button
+                                onClick={() => handleDraftHoMemo('approved')}
+                                disabled={draftingHoMemo}
+                                style={{ flex: 1, padding: '10px', borderRadius: '8px', border: '1px solid #16A34A', background: 'rgba(22,163,74,0.08)', color: '#16A34A', fontWeight: 600, fontSize: '13px', cursor: 'pointer' }}
+                              >
+                                {draftingHoMemo ? 'Generating Memo...' : '📝 Draft Approval Memo'}
+                              </button>
+                              <button
+                                onClick={() => handleDraftHoMemo('rejected')}
+                                disabled={draftingHoMemo}
+                                style={{ flex: 1, padding: '10px', borderRadius: '8px', border: '1px solid #EF4444', background: 'rgba(239,68,68,0.08)', color: '#EF4444', fontWeight: 600, fontSize: '13px', cursor: 'pointer' }}
+                              >
+                                {draftingHoMemo ? 'Generating Memo...' : '📝 Draft Rejection Memo'}
+                              </button>
+                            </div>
+
+                            {workflow?.phaseData?.hoDecisionMemo && (
+                              <div style={{ marginTop: '10px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                                <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-3)', textTransform: 'uppercase' }}>Drafted Memo Preview (Edit/Save Supported)</div>
+                                {renderReportAccordion(workflow.phaseData.hoDecisionMemo, false)}
+
+                                <div style={{ display: 'flex', gap: '10px', marginTop: '5px' }}>
+                                  <button
+                                    onClick={() => handleSubmitHoDecision(workflow.phaseData.hoDecisionMemo.decision)}
+                                    disabled={submittingHoDecision}
+                                    style={{ flex: 1, padding: '12px', borderRadius: '8px', border: 'none', background: workflow.phaseData.hoDecisionMemo.decision === 'approved' ? '#16A34A' : '#EF4444', color: '#fff', fontWeight: 700, fontSize: '13.5px', cursor: 'pointer', boxShadow: '0 2px 4px rgba(0,0,0,0.1)' }}
+                                  >
+                                    {submittingHoDecision ? 'Submitting Decision...' : workflow.phaseData.hoDecisionMemo.decision === 'approved' ? '✓ Grant Oral Permission & Approve' : '✗ Reject Trap Proposal'}
+                                  </button>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        ) : (
+                          <div style={{ padding: '14px', borderRadius: '8px', background: 'rgba(245,158,11,0.08)', border: '1px solid #F59E0B', color: '#B45309', fontSize: '13.5px', fontWeight: 500 }}>
+                            ⏳ Pending decision at Head Office (Jt. Director V.K. Sharma).
+                          </div>
+                        )
+                      )}
+
+                      {/* AWAITING DSP INSTRUCTION */}
+                      {workflow?.phaseSubstatus === 'approved' && !workflow?.phaseData?.dsp_instructed_inspector && (
+                        role === 'dsp' ? (
+                          <div style={{ marginTop: '15px', borderTop: '1px solid var(--border)', paddingTop: '15px' }}>
+                            <p style={{ fontSize: '13px', color: 'var(--text-2)', marginBottom: '10px' }}>
+                              🔔 Oral permission granted by HO. You must now instruct the Inspector to proceed with registering the FIR.
+                            </p>
+                            <button
+                              onClick={handleDspInstruct}
+                              disabled={dspInstructing}
+                              style={{ padding: '10px 16px', borderRadius: '8px', border: 'none', background: '#0F172A', color: '#fff', fontWeight: 600, fontSize: '13px', cursor: 'pointer' }}
+                            >
+                              {dspInstructing ? 'Sending Instruction...' : '📣 Instruct Inspector to Register FIR'}
+                            </button>
+                          </div>
+                        ) : (
+                          <div style={{ marginTop: '15px', borderTop: '1px solid var(--border)', paddingTop: '15px' }}>
+                            <div style={{ padding: '14px', borderRadius: '8px', background: 'rgba(245,158,11,0.08)', border: '1px solid #F59E0B', color: '#B45309', fontSize: '13.5px', fontWeight: 500 }}>
+                              ⏳ Pending instruction at DSP Ramesh Kumar.
+                            </div>
+                          </div>
+                        )
+                      )}
+
+                      {/* AWAITING INSPECTOR FIR REGISTRATION */}
+                      {workflow?.phaseSubstatus === 'approved' && workflow?.phaseData?.dsp_instructed_inspector && (
+                        role === 'io' ? (
+                          <div style={{ marginTop: '15px', borderTop: '1px solid var(--border)', paddingTop: '15px' }}>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                              <p style={{ fontSize: '13px', color: 'var(--text-2)', margin: 0 }}>
+                                ✍️ DSP has issued instructions. Enter the registered FIR Number to advance.
+                              </p>
+                              <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                                <input
+                                  type="text"
+                                  value={firNumberInput}
+                                  onChange={(e) => setFirNumberInput(e.target.value)}
+                                  placeholder="e.g. FIR/TS-ACB/2026/042"
+                                  style={{ padding: '8px 12px', borderRadius: '6px', border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text)', fontSize: '13px', flex: 1 }}
+                                />
+                                <button
+                                  onClick={handleRegisterFir}
+                                  disabled={registeringFir || !firNumberInput.trim()}
+                                  style={{ padding: '9px 16px', borderRadius: '6px', border: 'none', background: '#16A34A', color: '#fff', fontWeight: 600, fontSize: '13px', cursor: firNumberInput.trim() ? 'pointer' : 'not-allowed' }}
+                                >
+                                  {registeringFir ? 'Submitting...' : 'Register FIR'}
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        ) : (
+                          <div style={{ marginTop: '15px', borderTop: '1px solid var(--border)', paddingTop: '15px' }}>
+                            <div style={{ padding: '14px', borderRadius: '8px', background: 'rgba(245,158,11,0.08)', border: '1px solid #F59E0B', color: '#B45309', fontSize: '13.5px', fontWeight: 500 }}>
+                              ⏳ Pending FIR registration at Insp. D. Prakash Reddy.
+                            </div>
+                          </div>
+                        )
+                      )}
+
+                      {workflow?.phaseSubstatus === 'fir_registered' && (
+                        <div style={{ marginTop: '15px', padding: '12px 14px', borderRadius: '8px', background: 'rgba(22,163,74,0.08)', border: '1px solid #16A34A', color: '#16A34A', fontSize: '13px' }}>
+                          ✓ FIR successfully registered: <strong>{c.firNumber || workflow?.firNumber || 'Registered'}</strong>. The case is now ready to advance to Trap Operations.
+                        </div>
+                      )}
+
+                      {workflow?.phaseSubstatus === 'rejected' && (
+                        <div style={{ marginTop: '15px', padding: '12px 14px', borderRadius: '8px', background: 'rgba(239,68,68,0.08)', border: '1px solid #EF4444', color: '#EF4444', fontSize: '13px' }}>
+                          ✗ Trap proposal rejected by Head Office. Case closed and reverted for direct departmental action.
+                        </div>
+                      )}
+                    </div>
+
+                    {workflow?.phaseData?.hoDecisionMemo && workflow?.phaseSubstatus !== 'pending' && workflow?.phaseSubstatus !== 'submitted' && (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                        <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Finalized Memo</div>
+                        {renderReportAccordion(workflow.phaseData.hoDecisionMemo, true)}
+                      </div>
+                    )}
+                  </div>
                 )}
 
                 {activePhase === 'trap' && (

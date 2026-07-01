@@ -359,12 +359,123 @@ function VerbatimReportDoc({ r }) {
   );
 }
 
+// ── Head Office Memo renderer ─────────────────────────────────────────────────
+
+function HoMemoReportDoc({ r }) {
+  const paragraphs = r.narrativeParagraphs || [];
+
+  function handlePrint() {
+    const w = window.open('', '_blank', 'width=820,height=1000');
+    if (!w) return;
+    w.document.write(buildHoMemoPrintHtml(r));
+    w.document.close();
+    w.focus();
+    setTimeout(() => w.print(), 250);
+  }
+
+  return (
+    <div style={docWrapper}>
+      <div style={docTitleBar}>
+        <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text)' }}>{r.title}</span>
+        <ActionBar onCopy={() => navigator.clipboard.writeText(r.body || '')} onPrint={handlePrint} />
+      </div>
+      <div style={a4Viewport}>
+        <div style={a4Page}>
+          <Watermark />
+          <div style={{ position: 'relative', zIndex: 1 }}>
+            <div style={{ textAlign: 'center', fontWeight: 700, marginBottom: '10px' }}>
+              <div style={{ fontSize: '14px' }}>GOVERNMENT OF TELANGANA</div>
+              <div style={{ fontSize: '14px' }}>ANTI-CORRUPTION BUREAU, HEAD OFFICE</div>
+              <div style={{ fontSize: '12px', fontWeight: 'normal', marginTop: '3px' }}>ROAD NO. 12, BANJARA HILLS, HYDERABAD</div>
+            </div>
+            <hr style={thickRule} />
+
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '14px', fontSize: '13px' }}>
+              <span>Memo No: {r.memoNumber}</span>
+              <span>Date: {r.date}</span>
+            </div>
+
+            <table style={{ width: '100%', marginBottom: '16px', fontSize: '12.5px' }}>
+              <tbody>
+                <tr>
+                  <td style={subLabel}>SUB:</td>
+                  <td style={subContent}>{r.subject}</td>
+                </tr>
+                <tr>
+                  <td style={subLabel}>REF:</td>
+                  <td style={subContent}>{r.reference}</td>
+                </tr>
+              </tbody>
+            </table>
+
+            <div style={{ marginTop: '20px' }}>
+              {paragraphs.map((p, i) => (
+                <p key={i} style={{ marginBottom: '12px', textAlign: 'justify', pageBreakInside: 'avoid', orphans: 3, widows: 3 }}>
+                  {i + 1}. {p}
+                </p>
+              ))}
+            </div>
+
+            <div style={{ textAlign: 'right', marginTop: '48px', lineHeight: 1.8, pageBreakInside: 'avoid' }}>
+              <div style={{ fontWeight: 700 }}>({r.signatoryName || 'Sri C. V. Anand, IPS'})</div>
+              <div>{r.signatoryDesignation || 'Director General'}</div>
+              <div>ACB, Head Office, Hyderabad.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function buildHoMemoPrintHtml(r) {
+  const paras = (r.narrativeParagraphs || []).map(
+    (p, i) => `<p class="numbered-para">${i + 1}. ${e(p)}</p>`,
+  ).join('');
+  return `<!doctype html><html><head><meta charset="utf-8"><title>Head Office Decision Memo</title>
+<style>${PRINT_BASE_CSS}</style></head><body>
+<img class="watermark" src="${ACB_LOGO_URL}" width="220" height="220" alt=""/>
+<div class="content">
+<div class="header-centered">
+  <p>GOVERNMENT OF TELANGANA</p>
+  <p>ANTI-CORRUPTION BUREAU, HEAD OFFICE</p>
+  <p style="font-size: 11px; font-weight: normal;">ROAD NO. 12, BANJARA HILLS, HYDERABAD</p>
+</div>
+<hr class="thick"/>
+<div class="meta-row">
+  <span>Memo No: ${e(r.memoNumber)}</span>
+  <span>Date: ${e(r.date)}</span>
+</div>
+<table class="sub-ref-table"><tbody>
+  <tr>
+    <td class="label">SUB:</td>
+    <td>${e(r.subject)}</td>
+  </tr>
+  <tr>
+    <td class="label">REF:</td>
+    <td>${e(r.reference)}</td>
+  </tr>
+</tbody></table>
+<div class="narrative-body">
+  ${paras}
+</div>
+<div class="sign-off-right">
+  <br><br>
+  <p><strong>(${e(r.signatoryName)})</strong></p>
+  <p>${e(r.signatoryDesignation)}</p>
+  <p>Anti-Corruption Bureau, H.O.</p>
+</div>
+</div>
+</body></html>`;
+}
+
 // ── Main export — dispatches by documentType ─────────────────────────────────
 
 export default function ReportDocumentView({ report }) {
   if (!report) return null;
   if (report.documentType === 'verification') return <VerificationReportDoc r={report} />;
   if (report.documentType === 'verbatim') return <VerbatimReportDoc r={report} />;
+  if (report.documentType === 'ho_memo') return <HoMemoReportDoc r={report} />;
   // Unknown type — plain fallback
   return (
     <div style={docWrapper}>

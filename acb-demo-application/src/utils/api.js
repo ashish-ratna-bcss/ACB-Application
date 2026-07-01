@@ -86,4 +86,24 @@ export const api = {
       method: 'PATCH',
       body: JSON.stringify({ report_id: reportId, content }),
     }),
+  draftHoDecisionMemo: (caseId, decision, role) =>
+    request(`/workflow/cases/${encodeURIComponent(caseId)}/ho-decision-memo`, {
+      method: 'POST',
+      body: JSON.stringify({ decision, actorRole: role }),
+    }),
+  submitHoDecision: (caseId, decision, role) =>
+    request(`/workflow/cases/${encodeURIComponent(caseId)}/ho-decision-memo/submit`, {
+      method: 'POST',
+      body: JSON.stringify({ decision, actorRole: role }),
+    }),
+  dspInstructInspector: (caseId, role) =>
+    request(`/workflow/cases/${encodeURIComponent(caseId)}/dsp-instruct`, {
+      method: 'POST',
+      body: JSON.stringify({ actorRole: role }),
+    }),
+  registerFir: (caseId, firNumber, role) =>
+    request(`/workflow/cases/${encodeURIComponent(caseId)}/register-fir`, {
+      method: 'POST',
+      body: JSON.stringify({ fir_number: firNumber, actorRole: role }),
+    }),
 };

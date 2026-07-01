@@ -1,0 +1,6 @@
+Ah! Look at the output:
+`Total lines in overview.txt: 40`
+Wait, let's write another script that searches in *other* conversation directories.
+The prompt mentions:
+`Conversation logs are stored locally in the filesystem under: <appDataDir>/brain/<conversation-id>/.system_generated/logs`
+But wait, we can look at all past conversation folders in `/home/ashish-ratna/.gemini/antigravity/brain/`! Let's write a python script to search for the Bag of Words `"perused the file"` or `ho_memo_system_prompt` in *all* conversation folders! That will definitely find the untruncated prompt! Let's do that!

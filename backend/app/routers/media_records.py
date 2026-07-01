@@ -592,6 +592,19 @@ def save_report_edits(case_id: str, payload: dict):
         content = payload.get("content", "")
 
         pd = json.loads(case.phase_data) if case.phase_data else {}
+
+        if report_id == "ho_decision_memo":
+            memo = pd.get("hoDecisionMemo", {})
+            if not memo:
+                raise HTTPException(status_code=404, detail="Head Office Decision Memo not found in phase data")
+            paras = [p.strip() for p in content.split("\n\n") if p.strip()]
+            memo["narrativeParagraphs"] = paras
+            memo["body"] = content
+            pd["hoDecisionMemo"] = memo
+            update_phase_data(db, case, pd)
+            db.commit()
+            return {"ok": True, "report": memo}
+
         reports = pd.get("verificationReports", {})
         if report_id not in reports:
             raise HTTPException(status_code=404, detail=f"Report '{report_id}' not found in phase data")
