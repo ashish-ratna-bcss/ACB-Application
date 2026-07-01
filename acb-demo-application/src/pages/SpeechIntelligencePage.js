@@ -128,12 +128,14 @@ export default function SpeechIntelligencePage() {
   const activeMediaName = selectedFile?.name || (recordedBlob ? 'Recorded audio' : '');
   const selectedCaseLabel = useMemo(() => {
     const found = cases.find((c) => c.id === selectedCaseId);
-    return found ? `${found.id} - ${found.title}` : '— Select case —';
+    if (!found) return '— Select case —';
+    const display = found.trackingId || found.id;
+    return `${display} - ${found.title}`;
   }, [cases, selectedCaseId]);
   const filteredCases = useMemo(() => {
     const q = caseSearch.trim().toLowerCase();
     if (!q) return cases;
-    return cases.filter((c) => (`${c.id} ${c.title || ''}`).toLowerCase().includes(q));
+    return cases.filter((c) => (`${c.trackingId || c.id} ${c.id} ${c.title || ''}`).toLowerCase().includes(q));
   }, [caseSearch, cases]);
 
   const recordToResult = (rec) => {
@@ -499,7 +501,7 @@ export default function SpeechIntelligencePage() {
                       </button>
                       {filteredCases.map((item) => (
                         <button key={item.id} type="button" onClick={() => { setSelectedCaseId(item.id); setCaseMenuOpen(false); setCaseSearch(''); }} style={{ ...dropdownItem, ...(selectedCaseId === item.id ? dropdownItemActive : null) }}>
-                          {item.id} - {item.title}
+                          {item.trackingId || item.id} - {item.title}
                         </button>
                       ))}
                       {filteredCases.length === 0 ? <div style={dropdownEmpty}>No matching cases</div> : null}
