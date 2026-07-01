@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
-const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8000';
+const BACKEND_URL = process.env.REACT_APP_BACKEND_URL ?? 'http://localhost:8000';
 const API_BASE = `${BACKEND_URL}/api/speech-intel`;
 const POLL_INTERVAL_MS = 4000;
 const ACCEPTED_HINT = 'WAV, MP3, M4A, MP4, MOV, WebM, OGG and similar audio/video files';

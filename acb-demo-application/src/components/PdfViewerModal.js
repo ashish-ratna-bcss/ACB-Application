@@ -1,6 +1,6 @@
 import React from 'react';
 
-const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8000';
+const BACKEND_URL = process.env.REACT_APP_BACKEND_URL ?? 'http://localhost:8000';
 
 export default function PdfViewerModal({ isOpen, onClose, pdfUrl, fileName }) {
   if (!isOpen || !pdfUrl) return null;

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
-const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8000';
+const BACKEND_URL = process.env.REACT_APP_BACKEND_URL ?? 'http://localhost:8000';
 
 const PIPELINE_STAGES = [
   { key: 'converting_pdf', label: 'Converting PDF', description: 'Rendering pages' },

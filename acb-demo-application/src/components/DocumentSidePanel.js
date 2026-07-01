@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 
-const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8000';
+const BACKEND_URL = process.env.REACT_APP_BACKEND_URL ?? 'http://localhost:8000';
 
 export default function DocumentSidePanel({ isOpen, onClose, pdfUrl, fileName, document }) {
   const [iframeLoaded, setIframeLoaded] = useState(false);
