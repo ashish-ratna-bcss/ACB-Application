@@ -24,7 +24,7 @@ services:
     depends_on:
       - acb-qdrant
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -41,7 +41,7 @@ services:
     networks:
       - app_default
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:6333/health"]
+      test: ["CMD-SHELL", "wget -qO- http://localhost:6333/ || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3
