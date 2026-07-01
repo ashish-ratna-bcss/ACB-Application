@@ -342,7 +342,8 @@ export default function SpeechIntelligencePage() {
       setViewingHistory(false);
       setActiveRecordId(null);
       // Auto-save to the selected case (also logs evidence + refreshes history).
-      if (selectedCaseId) await persistToCase(data, filename, ref);
+      // Note: on auto-save after processing, speakerNames are empty (just processed), pass empty map.
+      if (selectedCaseId) await persistToCase(data, filename, ref, {});
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Speech processing failed.');
       setProgress(null);
@@ -386,25 +387,39 @@ export default function SpeechIntelligencePage() {
     }
   }
 
-  const persistToCase = useCallback(async (data, fileName, ref) => {
+  const persistToCase = useCallback(async (data, fileName, ref, nameMap) => {
     if (!data || !selectedCaseId) return;
     const segs = data?.transcript?.segments || [];
     const spk = data?.diarization?.speakers || [];
+    const resolveSpk = (person) => (nameMap && nameMap[person]?.trim()) ? nameMap[person].trim() : person;
     setSaveStatus('saving');
     try {
+      // Apply speaker name mapping before saving so renamed names are persisted.
+      const mappedSegs = segs.map((s) => ({
+        speaker: resolveSpk(s.speaker || 'Unknown'),
+        start: Number(s.start) || 0,
+        end: Number(s.end) || 0,
+        text: s.text || '',
+      }));
+      // Rebuild transcript text with resolved names.
+      const mappedData = {
+        ...data,
+        transcript: { ...data.transcript, segments: mappedSegs },
+        conversation_table: {
+          rows: (data?.conversation_table?.rows || []).map((r) => ({
+            ...r,
+            person: resolveSpk(r.person || ''),
+          })),
+        },
+      };
       const payload = {
         caseId: selectedCaseId,
         fileName: fileName || 'unknown',
         audioDescription: audioDescription || null,
         language: segs.find((s) => s.language)?.language || null,
         task: 'transcribe',
-        text: deriveTranscript(data),
-        segments: segs.map((s) => ({
-          speaker: s.speaker || 'Unknown',
-          start: Number(s.start) || 0,
-          end: Number(s.end) || 0,
-          text: s.text || '',
-        })),
+        text: deriveTranscript(mappedData),
+        segments: mappedSegs,
         originalSegments: [],
         speakerCount: spk.length,
         diarization: spk.length > 0,
@@ -429,7 +444,7 @@ export default function SpeechIntelligencePage() {
 
   function saveRecord() {
     const fileName = selectedFile?.name || (recordedBlob ? 'live-recording.webm' : (activeRecordId ? 'saved-record' : 'unknown'));
-    return persistToCase(result, fileName, intelRef);
+    return persistToCase(result, fileName, intelRef, speakerNames);
   }
 
   function openRecord(rec) {
