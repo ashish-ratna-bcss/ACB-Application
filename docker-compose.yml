@@ -41,7 +41,7 @@ services:
     networks:
       - app_default
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://localhost:6333/ || exit 1"]
+      test: ["CMD-SHELL", "bash -c '</dev/tcp/localhost/6333'"]
       interval: 30s
       timeout: 10s
       retries: 3
