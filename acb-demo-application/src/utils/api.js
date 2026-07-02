@@ -82,6 +82,9 @@ export const api = {
   draftVerificationReport: (caseId) => request(`/media-records/${encodeURIComponent(caseId)}/draft-report`, { method: 'POST' }),
   draftVerbatimReport: (caseId) => request(`/media-records/${encodeURIComponent(caseId)}/draft-verbatim`, { method: 'POST' }),
   draftVerificationReportStep: (caseId) => request(`/media-records/${encodeURIComponent(caseId)}/draft-verification`, { method: 'POST' }),
+  unlinkMediaRecord: (recordId) => request(`/media-records/${encodeURIComponent(recordId)}/unlink`, { method: 'POST' }),
+  unlinkDocument: (docId) => request(`/pdf/${encodeURIComponent(docId)}/unlink`, { method: 'POST' }),
+  unlinkReport: (caseId, reportId) => request(`/media-records/case/${encodeURIComponent(caseId)}/unlink-report/${encodeURIComponent(reportId)}`, { method: 'POST' }),
   saveReport: (caseId, reportId, content) =>
     request(`/media-records/${encodeURIComponent(caseId)}/save-report`, {
       method: 'PATCH',

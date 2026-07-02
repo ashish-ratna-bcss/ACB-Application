@@ -663,3 +663,55 @@ def save_report_edits(case_id: str, payload: dict):
         return {"ok": True, "report": reports[report_id]}
     finally:
         db.close()
+
+
+@router.post("/{record_id}/unlink", summary="Unlink a media record from its case")
+def unlink_media_record(record_id: str):
+    db = SessionLocal()
+    try:
+        r = db.query(MediaRecord).filter(MediaRecord.id == record_id).first()
+        if not r:
+            raise HTTPException(status_code=404, detail="Media record not found")
+        r.case_id = "" # unlink
+        db.commit()
+        return {"ok": True}
+    finally:
+        db.close()
+
+
+@router.post("/case/{case_id}/unlink-report/{report_id}", summary="Unlink/remove a report from case phase data")
+def unlink_case_report(case_id: str, report_id: str):
+    from app.models import Case
+    from app.services.case_workflow import update_phase_data
+
+    db = SessionLocal()
+    try:
+        case = db.query(Case).filter(Case.id == case_id).first()
+        if not case:
+            raise HTTPException(status_code=404, detail="Case not found")
+
+        pd = json.loads(case.phase_data) if case.phase_data else {}
+        reports = pd.get("verificationReports", {})
+        if report_id in reports:
+            del reports[report_id]
+            # Also reset corresponding checkpoints if needed
+            from app.services.case_workflow import update_checkpoint
+            if report_id == "verbatim_report":
+                try:
+                    update_checkpoint(db, case_id, "verification", "verbatim_prepared", False)
+                except Exception:
+                    pass
+            elif report_id == "verification_report":
+                try:
+                    update_checkpoint(db, case_id, "verification", "verification_report", False)
+                except Exception:
+                    pass
+
+            pd["verificationReports"] = reports
+            update_phase_data(db, case, pd)
+            db.commit()
+            return {"ok": True}
+        else:
+            raise HTTPException(status_code=404, detail=f"Report {report_id} not found in case phase data")
+    finally:
+        db.close()

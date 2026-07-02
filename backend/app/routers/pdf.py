@@ -862,7 +862,12 @@ def get_case_detail(case_id: str):
             .all()
         )
         if not docs:
-            raise HTTPException(status_code=404, detail="Case not found")
+            return {
+                "case_id": case_id,
+                "document_count": 0,
+                "total_subdocuments": 0,
+                "documents": [],
+            }
 
         result_docs = []
         total_subdocs = 0
@@ -931,5 +936,19 @@ def get_case_detail(case_id: str):
             "total_subdocuments": total_subdocs,
             "documents": result_docs,
         }
+    finally:
+        db.close()
+
+
+@router.post("/{document_id}/unlink", summary="Unlink a document from its case")
+def unlink_document(document_id: int):
+    db: Session = SessionLocal()
+    try:
+        d = db.query(Document).filter(Document.id == document_id).first()
+        if not d:
+            raise HTTPException(status_code=404, detail="Document not found")
+        d.case_id = "" # unlink
+        db.commit()
+        return {"ok": True}
     finally:
         db.close()

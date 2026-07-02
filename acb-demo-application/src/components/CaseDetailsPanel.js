@@ -270,6 +270,55 @@ export default function CaseDetailsPanel({ caseData, phase: pagePhase, onClose, 
     }
   }
 
+  async function handleUnlinkMedia(m) {
+    const fileName = m.fileName || 'Audio record';
+    const caseIdDisplay = caseData.trackingId || caseData.id || caseKey;
+    if (window.confirm(`Are you sure you want to remove the file "${fileName}" linked with case "${caseIdDisplay}"?`)) {
+      try {
+        await api.unlinkMediaRecord(m.id);
+        const records = await api.getMediaRecords(caseKey);
+        setMediaRecords(Array.isArray(records) ? records : []);
+        const check = await api.checkMediaRecords(caseKey);
+        setHasMediaRecords(check.hasMediaRecords || false);
+        const wf = await api.getCaseWorkflow(caseKey, pagePhase || undefined);
+        setWorkflow(wf);
+      } catch (e) {
+        setActionError(e.message);
+      }
+    }
+  }
+
+  async function handleUnlinkDocument(d) {
+    const fileName = d.original_name || d.file_name || 'Document';
+    const caseIdDisplay = caseData.trackingId || caseData.id || caseKey;
+    if (window.confirm(`Are you sure you want to remove the file "${fileName}" linked with case "${caseIdDisplay}"?`)) {
+      try {
+        await api.unlinkDocument(d.document_id);
+        const res = await api.getCaseDocuments(caseKey);
+        setCaseDocs(Array.isArray(res?.documents) ? res.documents : []);
+        const wf = await api.getCaseWorkflow(caseKey, pagePhase || undefined);
+        setWorkflow(wf);
+      } catch (e) {
+        setActionError(e.message);
+      }
+    }
+  }
+
+  async function handleUnlinkReport(reportId, reportTitle) {
+    const caseIdDisplay = caseData.trackingId || caseData.id || caseKey;
+    if (window.confirm(`Are you sure you want to remove the file "${reportTitle}" linked with case "${caseIdDisplay}"?`)) {
+      try {
+        await api.unlinkReport(caseKey, reportId);
+        const wf = await api.getCaseWorkflow(caseKey, pagePhase || undefined);
+        setWorkflow(wf);
+        const stored = wf?.phaseData?.verificationReports;
+        setDraftedReports(stored ? Object.values(stored) : null);
+      } catch (e) {
+        setActionError(e.message);
+      }
+    }
+  }
+
   function getReportEditText(r) {
     if (r.id === 'verification_report' || r.id === 'ho_decision_memo') {
       return (r.narrativeParagraphs || []).join('\n\n');
@@ -672,10 +721,30 @@ export default function CaseDetailsPanel({ caseData, phase: pagePhase, onClose, 
                           </span>
                         </div>
                         {mediaRecords.length > 0 ? (
-                          <ul style={{ margin: 0, paddingLeft: '14px', color: 'var(--text-3)', fontSize: '11px', display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                          <ul style={{ margin: 0, paddingLeft: 0, listStyle: 'none', color: 'var(--text-3)', fontSize: '11px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
                             {mediaRecords.map((m) => (
-                              <li key={m.id} style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                {m.fileName || 'Audio record'} ({m.languageName || 'unknown'})
+                              <li key={m.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px' }}>
+                                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }} title={m.fileName}>
+                                  {m.fileName || 'Audio record'} ({m.languageName || 'unknown'})
+                                </span>
+                                <button
+                                  onClick={() => handleUnlinkMedia(m)}
+                                  style={{
+                                    border: 'none',
+                                    background: 'transparent',
+                                    color: '#EF4444',
+                                    fontSize: '12px',
+                                    cursor: 'pointer',
+                                    padding: '0 4px',
+                                    fontWeight: 'bold',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center'
+                                  }}
+                                  title="Unlink Audio Record"
+                                >
+                                  ✕
+                                </button>
                               </li>
                             ))}
                           </ul>
@@ -751,20 +820,39 @@ export default function CaseDetailsPanel({ caseData, phase: pagePhase, onClose, 
                         {/* Source 1: Verbatim Report */}
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                           <span style={{ color: 'var(--text-2)', fontSize: '11px' }}>1. Verbatim Report (Mandatory):</span>
-                          <span style={{
-                            fontSize: '10px',
-                            fontWeight: 700,
-                            color: verbatimReportDrafted ? '#16A34A' : '#EF4444',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '3px'
-                          }}>
-                            {verbatimReportDrafted ? '✓ Ready' : '✗ Required'}
-                          </span>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <span style={{
+                              fontSize: '10px',
+                              fontWeight: 700,
+                              color: verbatimReportDrafted ? '#16A34A' : '#EF4444',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '3px'
+                            }}>
+                              {verbatimReportDrafted ? '✓ Ready' : '✗ Required'}
+                            </span>
+                            {verbatimReportDrafted && (
+                              <button
+                                onClick={() => handleUnlinkReport('verbatim_report', 'Verbatim Transcript Report')}
+                                style={{
+                                  border: 'none',
+                                  background: 'transparent',
+                                  color: '#EF4444',
+                                  fontSize: '12px',
+                                  cursor: 'pointer',
+                                  padding: '0 4px',
+                                  fontWeight: 'bold'
+                                }}
+                                title="Unlink Verbatim Report"
+                              >
+                                ✕
+                              </button>
+                            )}
+                          </div>
                         </div>
 
                         {/* Source 2: Document Processor stage complaints */}
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '1px' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                             <span style={{ color: 'var(--text-2)', fontSize: '11px' }}>2. Documents (Complaint Stage):</span>
                             <span style={{ fontSize: '10px', fontWeight: 700, color: caseDocs.filter(d => d.phase === 'complaints' || d.phase === 'complaint').length > 0 ? '#16A34A' : 'var(--text-3)' }}>
@@ -772,14 +860,35 @@ export default function CaseDetailsPanel({ caseData, phase: pagePhase, onClose, 
                             </span>
                           </div>
                           {caseDocs.filter(d => d.phase === 'complaints' || d.phase === 'complaint').length > 0 && (
-                            <div style={{ fontSize: '9.5px', color: 'var(--text-3)', paddingLeft: '8px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                              {caseDocs.filter(d => d.phase === 'complaints' || d.phase === 'complaint').map(d => d.original_name || d.file_name).join(', ')}
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', paddingLeft: '8px' }}>
+                              {caseDocs.filter(d => d.phase === 'complaints' || d.phase === 'complaint').map(d => (
+                                <div key={d.document_id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '6px', fontSize: '9.5px', color: 'var(--text-3)' }}>
+                                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }} title={d.original_name || d.file_name}>
+                                    {d.original_name || d.file_name}
+                                  </span>
+                                  <button
+                                    onClick={() => handleUnlinkDocument(d)}
+                                    style={{
+                                      border: 'none',
+                                      background: 'transparent',
+                                      color: '#EF4444',
+                                      fontSize: '11px',
+                                      cursor: 'pointer',
+                                      padding: '0 2px',
+                                      fontWeight: 'bold'
+                                    }}
+                                    title="Unlink Document"
+                                  >
+                                    ✕
+                                  </button>
+                                </div>
+                              ))}
                             </div>
                           )}
                         </div>
 
                         {/* Source 3: Document Processor stage verification */}
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '1px' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                             <span style={{ color: 'var(--text-2)', fontSize: '11px' }}>3. Documents (Verification Stage):</span>
                             <span style={{ fontSize: '10px', fontWeight: 700, color: caseDocs.filter(d => d.phase === 'verification').length > 0 ? '#16A34A' : 'var(--text-3)' }}>
@@ -787,8 +896,29 @@ export default function CaseDetailsPanel({ caseData, phase: pagePhase, onClose, 
                             </span>
                           </div>
                           {caseDocs.filter(d => d.phase === 'verification').length > 0 && (
-                            <div style={{ fontSize: '9.5px', color: 'var(--text-3)', paddingLeft: '8px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                              {caseDocs.filter(d => d.phase === 'verification').map(d => d.original_name || d.file_name).join(', ')}
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', paddingLeft: '8px' }}>
+                              {caseDocs.filter(d => d.phase === 'verification').map(d => (
+                                <div key={d.document_id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '6px', fontSize: '9.5px', color: 'var(--text-3)' }}>
+                                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }} title={d.original_name || d.file_name}>
+                                    {d.original_name || d.file_name}
+                                  </span>
+                                  <button
+                                    onClick={() => handleUnlinkDocument(d)}
+                                    style={{
+                                      border: 'none',
+                                      background: 'transparent',
+                                      color: '#EF4444',
+                                      fontSize: '11px',
+                                      cursor: 'pointer',
+                                      padding: '0 2px',
+                                      fontWeight: 'bold'
+                                    }}
+                                    title="Unlink Document"
+                                  >
+                                    ✕
+                                  </button>
+                                </div>
+                              ))}
                             </div>
                           )}
                         </div>
