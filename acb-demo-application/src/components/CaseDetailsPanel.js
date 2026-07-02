@@ -61,6 +61,9 @@ export default function CaseDetailsPanel({ caseData, phase: pagePhase, onClose, 
   const [firNumberInput, setFirNumberInput] = useState('');
   const [dspInstructing, setDspInstructing] = useState(false);
   const [registeringFir, setRegisteringFir] = useState(false);
+  const [selectedEvidence, setSelectedEvidence] = useState(null);
+  const [evidenceLoading, setEvidenceLoading] = useState(false);
+  const [evidenceContent, setEvidenceContent] = useState(null);
 
   const caseKey = caseData?.caseId || caseData?.id;
 
@@ -267,6 +270,77 @@ export default function CaseDetailsPanel({ caseData, phase: pagePhase, onClose, 
     } finally {
       setDraftingReport(false);
       setDraftStep(null);
+    }
+  }
+
+  const formatSeconds = (sec) => {
+    if (typeof sec !== 'number' || isNaN(sec)) return '00:00';
+    const m = Math.floor(sec / 60).toString().padStart(2, '0');
+    const s = Math.floor(sec % 60).toString().padStart(2, '0');
+    return `${m}:${s}`;
+  };
+
+  async function handleEvidenceClick(ev) {
+    setSelectedEvidence(ev);
+    setEvidenceLoading(true);
+    setEvidenceContent(null);
+    try {
+      if (ev.evidenceType === 'document') {
+        const doc = caseDocs.find(
+          d => (d.file_name === ev.name || d.original_name === ev.name || d.file_name === ev.title || d.original_name === ev.title || (d.original_name && ev.name.includes(d.original_name)) || (d.file_name && ev.name.includes(d.file_name)))
+        );
+        const docIdOrName = doc ? doc.id : ev.name;
+        const data = await api.getDocumentContent(caseKey, docIdOrName);
+        setEvidenceContent({
+          type: 'document',
+          pages: data.pages || [],
+          fileName: data.file_name || ev.name,
+          title: ev.name
+        });
+      } else {
+        const media = mediaRecords.find(
+          m => (m.file_name === ev.name || m.file_name === ev.title || (m.file_name && ev.name.includes(m.file_name)))
+        );
+        if (media) {
+          setEvidenceContent({
+            type: 'audio',
+            segments: media.segments || [],
+            fileName: media.file_name,
+            title: ev.name
+          });
+        } else {
+          const data = await api.getMediaRecords(caseKey);
+          const found = data.find(
+            m => (m.file_name === ev.name || m.file_name === ev.title || (m.file_name && ev.name.includes(m.file_name)))
+          );
+          if (found) {
+            setEvidenceContent({
+              type: 'audio',
+              segments: found.segments || [],
+              fileName: found.file_name,
+              title: ev.name
+            });
+          } else {
+            setEvidenceContent({
+              type: 'audio',
+              segments: [],
+              fileName: ev.name,
+              title: ev.name,
+              empty: true
+            });
+          }
+        }
+      }
+    } catch (e) {
+      console.error("Failed to load evidence contents:", e);
+      setEvidenceContent({
+        error: e.message || "Failed to load evidence contents",
+        type: ev.evidenceType === 'document' ? 'document' : 'audio',
+        fileName: ev.name,
+        title: ev.name
+      });
+    } finally {
+      setEvidenceLoading(false);
     }
   }
 
@@ -1190,13 +1264,233 @@ export default function CaseDetailsPanel({ caseData, phase: pagePhase, onClose, 
             />
           </div>
 
-          <RightRail metadata={dynamicMetadata} evidence={evidenceDisplay} audit={workflow?.transitions?.map((t) => ({
-            action: t.action,
-            user: t.actorName,
-            time: t.createdAt ? new Date(t.createdAt).toLocaleString('en-IN') : '—',
-          })) || audit} />
+          <RightRail
+            metadata={dynamicMetadata}
+            evidence={evidenceDisplay}
+            onEvidenceClick={handleEvidenceClick}
+            audit={workflow?.transitions?.map((t) => ({
+              action: t.action,
+              user: t.actorName,
+              time: t.createdAt ? new Date(t.createdAt).toLocaleString('en-IN') : '—',
+            })) || audit}
+          />
         </div>
       </div>
+
+      {/* EVIDENCE POPUP DIALOG */}
+      {selectedEvidence && (
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(15, 23, 42, 0.7)',
+            backdropFilter: 'blur(8px)',
+            zIndex: 9999,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '24px',
+            animation: 'fadeIn 0.2s ease-out'
+          }}
+          onClick={() => setSelectedEvidence(null)}
+        >
+          <div
+            style={{
+              width: '100%',
+              maxWidth: '850px',
+              maxHeight: '85vh',
+              background: 'var(--surface, #ffffff)',
+              border: '1px solid var(--border)',
+              borderRadius: '16px',
+              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+              display: 'flex',
+              flexDirection: 'column',
+              overflow: 'hidden'
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div
+              style={{
+                padding: '16px 24px',
+                borderBottom: '1px solid var(--border)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                background: 'var(--surface-2, #f8fafc)'
+              }}
+            >
+              <div style={{ minWidth: 0 }}>
+                <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: 'var(--text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  📂 {selectedEvidence.name}
+                </h3>
+                <div style={{ fontSize: '11.5px', color: 'var(--text-3)', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span style={{
+                    textTransform: 'uppercase',
+                    fontSize: '10px',
+                    fontWeight: 800,
+                    padding: '2px 8px',
+                    borderRadius: '999px',
+                    background: selectedEvidence.bg,
+                    color: selectedEvidence.color
+                  }}>
+                    {selectedEvidence.evidenceType || 'evidence'}
+                  </span>
+                  <span>•</span>
+                  <span>ID: {selectedEvidence.id}</span>
+                </div>
+              </div>
+              <button
+                onClick={() => setSelectedEvidence(null)}
+                style={{
+                  border: 'none',
+                  background: 'none',
+                  fontSize: '20px',
+                  fontWeight: 'bold',
+                  color: 'var(--text-3)',
+                  cursor: 'pointer',
+                  padding: '4px 10px',
+                  borderRadius: '8px',
+                  transition: 'background 0.2s',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}
+                onMouseEnter={(e) => e.currentTarget.style.background = 'var(--surface-3)'}
+                onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Body */}
+            <div style={{ padding: '24px', overflowY: 'auto', flex: 1, background: 'var(--bg, #fafafa)' }}>
+              {evidenceLoading ? (
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '60px 20px', gap: '16px' }}>
+                  <div style={{ width: 36, height: 36, borderRadius: '50%', border: '3px solid #2563EB', borderTopColor: 'transparent', display: 'inline-block', animation: 'dpSpin 0.8s linear infinite' }} />
+                  <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-2)' }}>Fetching secure evidence contents...</span>
+                </div>
+              ) : evidenceContent ? (
+                evidenceContent.error ? (
+                  <div style={{ border: '1px solid #FCA5A5', background: '#FEE2E2', color: '#B91C1C', borderRadius: '12px', padding: '16px', fontSize: '13.5px', lineHeight: 1.5 }}>
+                    ⚠️ <strong>Error loading evidence:</strong> {evidenceContent.error}
+                  </div>
+                ) : evidenceContent.type === 'document' ? (
+                  <div>
+                    <div style={{ fontSize: '12px', color: 'var(--text-3)', fontStyle: 'italic', marginBottom: '14px', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                      ℹ️ Showing extracted & saved OCR output only
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                      {evidenceContent.pages && evidenceContent.pages.length > 0 ? (
+                        evidenceContent.pages.map((p) => (
+                          <div key={p.page_number} style={{ background: 'var(--surface, #ffffff)', border: '1px solid var(--border)', borderRadius: '10px', boxShadow: '0 1px 3px rgba(0,0,0,0.05)', padding: '18px' }}>
+                            <div style={{ fontSize: '10.5px', fontWeight: 700, color: 'var(--text-3)', borderBottom: '1px solid var(--border-2)', paddingBottom: '6px', marginBottom: '12px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                              📄 Page {p.page_number}
+                            </div>
+                            <p style={{ margin: 0, fontSize: '13.5px', color: 'var(--text)', whiteSpace: 'pre-wrap', lineHeight: 1.6 }}>
+                              {p.page_text || '(Empty Page)'}
+                            </p>
+                          </div>
+                        ))
+                      ) : (
+                        <div style={{ color: 'var(--text-3)', fontStyle: 'italic', fontSize: '13px', padding: '30px', textAlign: 'center', background: 'var(--surface)', border: '1px dashed var(--border)', borderRadius: '10px' }}>
+                          No OCR text extracted for this document.
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  <div>
+                    <div style={{ fontSize: '12px', color: 'var(--text-3)', fontStyle: 'italic', marginBottom: '14px', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                      ℹ️ Showing speech intelligence conversation table only
+                    </div>
+                    <div style={{ background: 'var(--surface, #ffffff)', border: '1px solid var(--border)', borderRadius: '10px', overflow: 'hidden', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
+                      {evidenceContent.segments && evidenceContent.segments.length > 0 ? (
+                        <div style={{ overflowX: 'auto' }}>
+                          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12.5px' }}>
+                            <thead>
+                              <tr style={{ background: 'var(--surface-2)', borderBottom: '1px solid var(--border)' }}>
+                                <th style={{ textAlign: 'left', padding: '12px 14px', color: 'var(--text-3)', fontWeight: 700, fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.5px', width: '40px' }}>#</th>
+                                <th style={{ textAlign: 'left', padding: '12px 14px', color: 'var(--text-3)', fontWeight: 700, fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.5px', width: '110px' }}>Time</th>
+                                <th style={{ textAlign: 'left', padding: '12px 14px', color: 'var(--text-3)', fontWeight: 700, fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.5px', width: '130px' }}>Speaker</th>
+                                <th style={{ textAlign: 'left', padding: '12px 14px', color: 'var(--text-3)', fontWeight: 700, fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Conversation</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {evidenceContent.segments.map((seg, idx) => (
+                                <tr key={idx} style={{ borderBottom: '1px solid var(--border-2)' }}>
+                                  <td style={{ padding: '12px 14px', color: 'var(--text-3)', fontWeight: 600 }}>{idx + 1}</td>
+                                  <td style={{ padding: '12px 14px', color: 'var(--text-2)', fontFamily: "'JetBrains Mono', monospace", fontSize: '11px', whiteSpace: 'nowrap' }}>
+                                    ⏰ {formatSeconds(seg.start)} - {formatSeconds(seg.end)}
+                                  </td>
+                                  <td style={{ padding: '12px 14px', verticalAlign: 'middle' }}>
+                                    <span style={{ fontSize: '10.5px', fontWeight: 700, padding: '3px 8px', borderRadius: '999px', background: 'rgba(22,163,74,0.12)', color: '#166534', display: 'inline-block' }}>
+                                      👤 {seg.speaker || 'Unknown'}
+                                    </span>
+                                  </td>
+                                  <td style={{ padding: '12px 14px', color: 'var(--text)', lineHeight: 1.5, fontSize: '13px' }}>
+                                    {seg.text || '—'}
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      ) : (
+                        <div style={{ color: 'var(--text-3)', fontStyle: 'italic', fontSize: '13px', padding: '30px', textAlign: 'center' }}>
+                          No dialogue segments or conversation table records available.
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )
+              ) : (
+                <div style={{ textAlign: 'center', color: 'var(--text-3)', fontSize: '13px', padding: '30px', background: 'var(--surface)', border: '1px dashed var(--border)', borderRadius: '10px' }}>
+                  No content found.
+                </div>
+              )}
+            </div>
+            {/* Footer */}
+            <div
+              style={{
+                padding: '12px 24px',
+                borderTop: '1px solid var(--border)',
+                display: 'flex',
+                justifyContent: 'flex-end',
+                background: 'var(--surface-2, #f8fafc)'
+              }}
+            >
+              <button
+                onClick={() => setSelectedEvidence(null)}
+                style={{
+                  padding: '8px 16px',
+                  borderRadius: '8px',
+                  border: '1px solid var(--border)',
+                  background: 'var(--surface, #ffffff)',
+                  color: 'var(--text-2)',
+                  fontSize: '12.5px',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  transition: 'all 0.15s ease'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = 'var(--surface-3)';
+                  e.currentTarget.style.borderColor = 'var(--text-3)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = 'var(--surface)';
+                  e.currentTarget.style.borderColor = 'var(--border)';
+                }}
+              >
+                Close Preview
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

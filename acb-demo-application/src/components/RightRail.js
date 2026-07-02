@@ -1,6 +1,6 @@
 import React from 'react';
 
-export default function RightRail({ metadata, evidence, audit }) {
+export default function RightRail({ metadata, evidence, onEvidenceClick, audit }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
       {/* METADATA */}
@@ -23,9 +23,29 @@ export default function RightRail({ metadata, evidence, audit }) {
             <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text)' }}>Evidence Inventory</span>
             <span style={{ fontSize: '11px', fontWeight: 600, fontFamily: "'JetBrains Mono',monospace", color: 'var(--text-3)' }}>{evidence.length} items</span>
           </div>
-          <div style={{ padding: '6px 18px 12px' }}>
+          <div style={{ padding: '6px 8px 12px' }}>
             {evidence.map((ev, i) => (
-              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '11px', padding: '10px 0', borderBottom: '1px solid var(--border-2)' }}>
+              <div
+                key={i}
+                onClick={() => onEvidenceClick && onEvidenceClick(ev)}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '11px',
+                  padding: '10px 10px',
+                  borderBottom: '1px solid var(--border-2)',
+                  cursor: 'pointer',
+                  borderRadius: '8px',
+                  transition: 'all 0.15s ease'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = 'var(--surface-2)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = 'transparent';
+                }}
+                title="Click to view evidence details"
+              >
                 <span style={{ width: '32px', height: '32px', borderRadius: '8px', background: ev.bg, color: ev.color, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                   <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d={ev.icon}></path></svg>
                 </span>
