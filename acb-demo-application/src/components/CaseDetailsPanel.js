@@ -50,6 +50,8 @@ export default function CaseDetailsPanel({ caseData, phase: pagePhase, onClose, 
   const [draftDone, setDraftDone] = useState(new Set());   // completed step ids
   const [draftError, setDraftError] = useState(null);
   const [draftedReports, setDraftedReports] = useState(null);
+  const [mediaRecords, setMediaRecords] = useState([]);
+  const [caseDocs, setCaseDocs] = useState([]);
   const [reportExpanded, setReportExpanded] = useState({});
   const [reportEditMode, setReportEditMode] = useState({});
   const [reportEdits, setReportEdits] = useState({});
@@ -79,6 +81,21 @@ export default function CaseDetailsPanel({ caseData, phase: pagePhase, onClose, 
       .catch((e) => setActionError(e.message))
       .finally(() => setLoading(false));
   }, [caseKey, pagePhase]);
+
+  useEffect(() => {
+    if (!caseKey) {
+      setMediaRecords([]);
+      setCaseDocs([]);
+      return;
+    }
+    api.getMediaRecords(caseKey)
+      .then((records) => setMediaRecords(Array.isArray(records) ? records : []))
+      .catch(() => setMediaRecords([]));
+
+    api.getCaseDocuments(caseKey)
+      .then((data) => setCaseDocs(Array.isArray(data?.documents) ? data.documents : []))
+      .catch(() => setCaseDocs([]));
+  }, [caseKey]);
 
   useEffect(() => {
     if (!caseKey) { setEvidenceItems([]); return; }
@@ -191,47 +208,59 @@ export default function CaseDetailsPanel({ caseData, phase: pagePhase, onClose, 
   const role = user?.role || 'io';
   const canAdvanceTo = (phase) => (ROLE_CAN_ADVANCE_TO[role] || ROLE_CAN_ADVANCE_TO.io).has(phase);
 
-  const reportsDrafted = !!(
-    draftedReports &&
-    draftedReports.some((r) => r.id === 'verbatim_report') &&
-    draftedReports.some((r) => r.id === 'verification_report')
-  );
+  const verbatimReportDrafted = !!(workflow?.phaseData?.verificationReports?.verbatim_report);
+  const verificationReportDrafted = !!(workflow?.phaseData?.verificationReports?.verification_report);
+  const reportsDrafted = verbatimReportDrafted && verificationReportDrafted;
 
-  const DRAFT_STEPS = [
-    { id: 'transcripts', label: 'Reading speech intelligence transcripts', sublabel: 'Extracting segments & speakers from all attached recordings' },
-    { id: 'verbatim', label: 'Drafting Verbatim Report', sublabel: 'Per-file sections + consolidated conclusion' },
-    { id: 'verification', label: 'Drafting Verification Report', sublabel: 'Using verbatim + complaint details as sources' },
-    { id: 'saving', label: 'Saving & ticking checkpoints', sublabel: 'Persisting to case phase data' },
+  const VERBATIM_DRAFT_STEPS = [
+    { id: 'verbatim', label: 'Drafting Verbatim Report', sublabel: 'Synthesizing recordings and speaker dialogues' }
   ];
 
-  async function handleDraftReports() {
+  const VERIFICATION_DRAFT_STEPS = [
+    { id: 'verification', label: 'Drafting Verification Report', sublabel: 'Combining Verbatim & Document Processor sources' }
+  ];
+
+  async function handleDraftVerbatim() {
     if (!caseKey) return;
     setActionError('');
     setDraftError(null);
     setDraftingReport(true);
-    setDraftStep('transcripts');
+    setDraftStep('verbatim');
     setDraftDone(new Set());
 
     try {
-      // Step 1 — Verbatim (backend reads transcripts + calls Ollama per file)
-      setDraftStep('verbatim');
       const verbatimData = await api.draftVerbatimReport(caseKey);
-      setDraftDone((prev) => new Set([...prev, 'transcripts', 'verbatim']));
+      setDraftDone((prev) => new Set([...prev, 'verbatim']));
 
-      // Step 2 — Verification (reads verbatim from phase_data, drafts)
-      setDraftStep('verification');
+      const wf = await api.getCaseWorkflow(caseKey, pagePhase || undefined);
+      setWorkflow(wf);
+      const stored = wf?.phaseData?.verificationReports;
+      setDraftedReports(stored ? Object.values(stored) : null);
+    } catch (e) {
+      setDraftError(e.message);
+      setActionError(e.message);
+    } finally {
+      setDraftingReport(false);
+      setDraftStep(null);
+    }
+  }
+
+  async function handleDraftVerification() {
+    if (!caseKey) return;
+    setActionError('');
+    setDraftError(null);
+    setDraftingReport(true);
+    setDraftStep('verification');
+    setDraftDone(new Set());
+
+    try {
       const verificationData = await api.draftVerificationReportStep(caseKey);
       setDraftDone((prev) => new Set([...prev, 'verification']));
 
-      // Step 3 — Refresh workflow (checkpoints etc already persisted by backend)
-      setDraftStep('saving');
       const wf = await api.getCaseWorkflow(caseKey, pagePhase || undefined);
       setWorkflow(wf);
-      setDraftDone((prev) => new Set([...prev, 'saving']));
-
-      // Collect both reports for display
-      const reports = [verbatimData.report, verificationData.report].filter(Boolean);
-      setDraftedReports(reports.length ? reports : null);
+      const stored = wf?.phaseData?.verificationReports;
+      setDraftedReports(stored ? Object.values(stored) : null);
     } catch (e) {
       setDraftError(e.message);
       setActionError(e.message);
@@ -467,19 +496,11 @@ export default function CaseDetailsPanel({ caseData, phase: pagePhase, onClose, 
                   Advance blocked — attach speech transcription
                 </button>
               ) : !reportsDrafted ? (
-                <>
-                  <button onClick={handleDraftReports} disabled={draftingReport} style={{ border: '1px solid #F59E0B', background: '#FCD34D', color: '#92400E', fontSize: '12px', fontWeight: 700, borderRadius: '8px', padding: '7px 12px', cursor: draftingReport ? 'wait' : 'pointer' }}>
-                    {draftingReport ? 'Drafting Phase Reports…' : 'Draft Verbatim & Verification Reports'}
-                  </button>
-                  <button disabled style={lockedBtn} title="Both mandatory reports must be drafted before advancing">
-                    Advance blocked — draft both reports
-                  </button>
-                </>
+                <button disabled style={lockedBtn} title="Both mandatory reports must be drafted before advancing">
+                  Advance blocked — draft both reports
+                </button>
               ) : workflow?.nextPhase ? (
                 <>
-                  <button onClick={handleDraftReports} disabled={draftingReport} style={{ border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text-2)', fontSize: '12px', fontWeight: 600, borderRadius: '8px', padding: '7px 12px', cursor: draftingReport ? 'wait' : 'pointer' }}>
-                    {draftingReport ? 'Re-drafting…' : 'Re-draft Reports'}
-                  </button>
                   {canAdvanceTo(workflow.nextPhase) ? (
                     <button onClick={handleAdvance} style={advanceBtn}>
                       Advance to {workflow.nextPhase.replace(/_/g, ' ')}
@@ -578,18 +599,246 @@ export default function CaseDetailsPanel({ caseData, phase: pagePhase, onClose, 
               onCheckpointToggle={workflow ? toggleCheckpoint : undefined}
             />
 
-            {activePhase === 'verification' && (draftingReport || draftError) && (
-              <DraftingProgress
-                steps={DRAFT_STEPS}
-                currentStep={draftStep}
-                completedSteps={draftDone}
-                error={draftError}
-              />
+            {activePhase === 'verification' && (
+              <div style={{
+                background: 'var(--surface)',
+                border: '1px solid var(--border)',
+                borderRadius: '12px',
+                padding: '20px',
+                boxShadow: 'var(--shadow)',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '16px'
+              }}>
+                <div style={{ borderBottom: '1px solid var(--border)', paddingBottom: '10px' }}>
+                  <h3 style={{ margin: 0, fontSize: '15px', fontWeight: 700, color: 'var(--text)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span>✍️</span> Phase 2 Report Drafting Workspace
+                  </h3>
+                  <p style={{ margin: '4px 0 0 0', fontSize: '12.5px', color: 'var(--text-3)', lineHeight: 1.4 }}>
+                    Draft independent Verbatim Preparation and Verification Reports sequentially. The Verbatim Preparation must always be completed before drafting the Verification Report.
+                  </p>
+                </div>
+
+                {/* Grid for Steps */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                  
+                  {/* STEP 1: Verbatim Preparation */}
+                  <div style={{
+                    border: '1px solid var(--border)',
+                    borderRadius: '8px',
+                    padding: '14px',
+                    background: 'var(--surface-2)',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'space-between',
+                    gap: '12px'
+                  }}>
+                    <div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                        <span style={{ fontSize: '10px', fontWeight: 700, color: '#3B82F6', textTransform: 'uppercase', background: 'rgba(59,130,246,0.1)', padding: '2px 6px', borderRadius: '4px' }}>
+                          Step 1
+                        </span>
+                        <span style={{
+                          fontSize: '11px',
+                          fontWeight: 600,
+                          color: verbatimReportDrafted ? '#16A34A' : '#F59E0B',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '4px'
+                        }}>
+                          {verbatimReportDrafted ? '✓ Drafted' : '● Not Drafted'}
+                        </span>
+                      </div>
+                      <h4 style={{ margin: '0 0 6px 0', fontSize: '13px', fontWeight: 700, color: 'var(--text)' }}>
+                        Verbatim Preparation
+                      </h4>
+                      <p style={{ margin: '0 0 10px 0', fontSize: '11.5px', color: 'var(--text-3)', lineHeight: '1.4' }}>
+                        Synthesizes Speech Intelligence transcripts into a formal ACB Verbatim Report, preserving speaker dialogue and adding contextual notes.
+                      </p>
+
+                      {/* Source Content Status */}
+                      <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '6px', padding: '10px', fontSize: '11.5px' }}>
+                        <div style={{ fontWeight: 600, color: 'var(--text-2)', marginBottom: '6px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                          <span>🎙️ Audio Intelligence Status</span>
+                          <span style={{
+                            fontSize: '9.5px',
+                            fontWeight: 700,
+                            padding: '1px 5px',
+                            borderRadius: '10px',
+                            background: mediaRecords.length > 0 ? 'rgba(22,163,74,0.1)' : 'rgba(239,68,68,0.1)',
+                            color: mediaRecords.length > 0 ? '#16A34A' : '#EF4444'
+                          }}>
+                            {mediaRecords.length > 0 ? `${mediaRecords.length} Files` : '0 Files'}
+                          </span>
+                        </div>
+                        {mediaRecords.length > 0 ? (
+                          <ul style={{ margin: 0, paddingLeft: '14px', color: 'var(--text-3)', fontSize: '11px', display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                            {mediaRecords.map((m) => (
+                              <li key={m.id} style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                {m.fileName || 'Audio record'} ({m.languageName || 'unknown'})
+                              </li>
+                            ))}
+                          </ul>
+                        ) : (
+                          <div style={{ color: '#EF4444', fontSize: '10.5px', fontStyle: 'italic' }}>
+                            ⚠ No audio transcripts available. Speech Intelligence files are mandatory to draft the Verbatim Report.
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    <button
+                      onClick={handleDraftVerbatim}
+                      disabled={draftingReport || mediaRecords.length === 0}
+                      style={{
+                        width: '100%',
+                        padding: '8px',
+                        borderRadius: '6px',
+                        border: '1px solid #3B82F6',
+                        background: mediaRecords.length === 0 ? 'var(--surface-3)' : 'rgba(59,130,246,0.08)',
+                        color: mediaRecords.length === 0 ? 'var(--text-3)' : '#3B82F6',
+                        fontWeight: 600,
+                        fontSize: '11.5px',
+                        cursor: (draftingReport || mediaRecords.length === 0) ? 'not-allowed' : 'pointer',
+                        transition: 'all 0.2s',
+                        textAlign: 'center'
+                      }}
+                    >
+                      {draftingReport && draftStep === 'verbatim' ? 'Drafting Verbatim Report...' : verbatimReportDrafted ? 'Re-draft Verbatim Report' : 'Draft Verbatim Report'}
+                    </button>
+                  </div>
+
+                  {/* STEP 2: Verification Report */}
+                  <div style={{
+                    border: '1px solid var(--border)',
+                    borderRadius: '8px',
+                    padding: '14px',
+                    background: 'var(--surface-2)',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'space-between',
+                    gap: '12px'
+                  }}>
+                    <div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                        <span style={{ fontSize: '10px', fontWeight: 700, color: '#16A34A', textTransform: 'uppercase', background: 'rgba(22,163,74,0.1)', padding: '2px 6px', borderRadius: '4px' }}>
+                          Step 2
+                        </span>
+                        <span style={{
+                          fontSize: '11px',
+                          fontWeight: 600,
+                          color: verificationReportDrafted ? '#16A34A' : '#F59E0B',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '4px'
+                        }}>
+                          {verificationReportDrafted ? '✓ Drafted' : '● Not Drafted'}
+                        </span>
+                      </div>
+                      <h4 style={{ margin: '0 0 6px 0', fontSize: '13px', fontWeight: 700, color: 'var(--text)' }}>
+                        Verification Report
+                      </h4>
+                      <p style={{ margin: '0 0 10px 0', fontSize: '11.5px', color: 'var(--text-3)', lineHeight: '1.4' }}>
+                        Drafts the official 4-paragraph Verification Report recommending action to the DSP, referencing both verbatim and document processor evidence.
+                      </p>
+
+                      {/* Source Content Status Check */}
+                      <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '6px', padding: '10px', fontSize: '11.5px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                        <div style={{ fontWeight: 600, color: 'var(--text-2)', borderBottom: '1px solid var(--border)', paddingBottom: '3px', marginBottom: '3px' }}>
+                          📋 Available Sources & Status
+                        </div>
+                        
+                        {/* Source 1: Verbatim Report */}
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <span style={{ color: 'var(--text-2)', fontSize: '11px' }}>1. Verbatim Report (Mandatory):</span>
+                          <span style={{
+                            fontSize: '10px',
+                            fontWeight: 700,
+                            color: verbatimReportDrafted ? '#16A34A' : '#EF4444',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '3px'
+                          }}>
+                            {verbatimReportDrafted ? '✓ Ready' : '✗ Required'}
+                          </span>
+                        </div>
+
+                        {/* Source 2: Document Processor stage complaints */}
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '1px' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <span style={{ color: 'var(--text-2)', fontSize: '11px' }}>2. Documents (Complaint Stage):</span>
+                            <span style={{ fontSize: '10px', fontWeight: 700, color: caseDocs.filter(d => d.phase === 'complaints' || d.phase === 'complaint').length > 0 ? '#16A34A' : 'var(--text-3)' }}>
+                              {caseDocs.filter(d => d.phase === 'complaints' || d.phase === 'complaint').length} Files
+                            </span>
+                          </div>
+                          {caseDocs.filter(d => d.phase === 'complaints' || d.phase === 'complaint').length > 0 && (
+                            <div style={{ fontSize: '9.5px', color: 'var(--text-3)', paddingLeft: '8px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              {caseDocs.filter(d => d.phase === 'complaints' || d.phase === 'complaint').map(d => d.original_name || d.file_name).join(', ')}
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Source 3: Document Processor stage verification */}
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '1px' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <span style={{ color: 'var(--text-2)', fontSize: '11px' }}>3. Documents (Verification Stage):</span>
+                            <span style={{ fontSize: '10px', fontWeight: 700, color: caseDocs.filter(d => d.phase === 'verification').length > 0 ? '#16A34A' : 'var(--text-3)' }}>
+                              {caseDocs.filter(d => d.phase === 'verification').length} Files
+                            </span>
+                          </div>
+                          {caseDocs.filter(d => d.phase === 'verification').length > 0 && (
+                            <div style={{ fontSize: '9.5px', color: 'var(--text-3)', paddingLeft: '8px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              {caseDocs.filter(d => d.phase === 'verification').map(d => d.original_name || d.file_name).join(', ')}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    <button
+                      onClick={handleDraftVerification}
+                      disabled={draftingReport || !verbatimReportDrafted}
+                      style={{
+                        width: '100%',
+                        padding: '8px',
+                        borderRadius: '6px',
+                        border: '1px solid #16A34A',
+                        background: !verbatimReportDrafted ? 'var(--surface-3)' : 'rgba(22,163,74,0.08)',
+                        color: !verbatimReportDrafted ? 'var(--text-3)' : '#16A34A',
+                        fontWeight: 600,
+                        fontSize: '11.5px',
+                        cursor: (draftingReport || !verbatimReportDrafted) ? 'not-allowed' : 'pointer',
+                        transition: 'all 0.2s',
+                        textAlign: 'center'
+                      }}
+                      title={!verbatimReportDrafted ? 'You must draft the Verbatim Report first before you can draft the Verification Report' : ''}
+                    >
+                      {draftingReport && draftStep === 'verification' ? 'Drafting Verification Report...' : verificationReportDrafted ? 'Re-draft Verification Report' : 'Draft Verification Report'}
+                    </button>
+                  </div>
+
+                </div>
+
+                {/* Progress rendering inside the workspace */}
+                {draftingReport && (
+                  <div style={{ marginTop: '8px' }}>
+                    <div style={{ fontSize: '12px', color: 'var(--text-2)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <div style={{ width: 12, height: 12, borderRadius: '50%', border: '2px solid #F59E0B', borderTopColor: 'transparent', display: 'inline-block', animation: 'dpSpin 0.8s linear infinite' }} />
+                      <span>Generating report draft using Ollama LLM. This may take a moment...</span>
+                    </div>
+                  </div>
+                )}
+                {draftError && (
+                  <div style={{ fontSize: '11px', color: '#DC2626', marginTop: '4px' }}>
+                    <strong>Draft Error:</strong> {draftError}
+                  </div>
+                )}
+              </div>
             )}
 
             {activePhase === 'verification' && draftedReports && draftedReports.length > 0 && (
               <>
-                <div style={{ fontSize: '11px', fontWeight: 600, letterSpacing: '0.5px', color: 'var(--text-3)', textTransform: 'uppercase' }}>
+                <div style={{ fontSize: '11px', fontWeight: 600, letterSpacing: '0.5px', color: 'var(--text-3)', textTransform: 'uppercase', marginTop: '12px' }}>
                   Mandatory Phase Reports {reportsDrafted ? '· Complete' : '· Incomplete'}
                 </div>
                 {['verbatim_report', 'verification_report']

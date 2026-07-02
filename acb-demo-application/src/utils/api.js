@@ -75,6 +75,7 @@ export const api = {
   getCaseComplaints: (caseId) => request(`/complaints/by-case/${encodeURIComponent(caseId)}`),
   getCaseEvidence: (caseId) => request(`/cases/${encodeURIComponent(caseId)}/evidence`),
   getMediaRecords: (caseId) => request(`/media-records?case_id=${encodeURIComponent(caseId)}`),
+  getCaseDocuments: (caseId) => request(`/pdf/case/${encodeURIComponent(caseId)}`),
   addFurtherComplaint: (caseId, body) =>
     request(`/complaints/by-case/${encodeURIComponent(caseId)}/further`, { method: 'POST', body: JSON.stringify(body) }),
   checkMediaRecords: (caseId) => request(`/media-records/case/${encodeURIComponent(caseId)}/check`),

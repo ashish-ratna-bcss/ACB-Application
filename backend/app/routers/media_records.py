@@ -431,7 +431,7 @@ def _extract_paragraphs(raw: str) -> list[str]:
     return paras if paras else [text.strip()]
 
 
-def _build_verification_report(case, complaint, verbatim_body) -> dict:
+def _build_verification_report(case, complaint, verbatim_body, doc_processor_body: str = "") -> dict:
     complainant = (complaint.complainant_name if complaint else None) or "the Complainant"
     complaint_date = (
         complaint.created_at.strftime("%d.%m.%Y") if (complaint and complaint.created_at) else _today()
@@ -451,7 +451,14 @@ def _build_verification_report(case, complaint, verbatim_body) -> dict:
         f"- Complaint summary: {complaint_summary}\n\n"
         f"VERBATIM REPORT (additional source — evidence from recorded interaction):\n"
         f"{(verbatim_body or '')[:4000]}\n\n"
-        f"Using BOTH the complaint details and the verbatim report above as sources, "
+    )
+    if doc_processor_body:
+        prompt += (
+            f"DOCUMENT PROCESSOR ATTACHED CONTENT (from Complaint and/or Verification stages):\n"
+            f"{doc_processor_body[:4000]}\n\n"
+        )
+    prompt += (
+        f"Using BOTH the complaint details, the verbatim report, and any document processor attached content above as sources, "
         f"draft the Verification Report. Return JSON only as instructed."
     )
     raw = _ollama_generate(VERIFICATION_SYSTEM_PROMPT, prompt)
@@ -494,7 +501,7 @@ def draft_verbatim_step(case_id: str):
         if not records:
             raise HTTPException(
                 status_code=400,
-                detail="Attach a Speech Intelligence transcription before drafting the Verbatim Report.",
+                detail="The Verbatim Report can only be drafted if required audio files from Audio Intelligence are available. Please upload and transcribe audio files in Speech Intelligence first.",
             )
 
         verbatim = _build_verbatim_report(case, records)
@@ -524,7 +531,7 @@ def draft_verbatim_step(case_id: str):
 def draft_verification_step(case_id: str):
     """Step 2 of 2. Reads verbatim from phase_data; drafts and persists Verification Report."""
     import requests
-    from app.models import Case, Complaint
+    from app.models import Case, Complaint, Document, PageContent
     from app.services.case_workflow import ensure_checkpoints, update_checkpoint, update_phase_data
 
     db = SessionLocal()
@@ -538,7 +545,7 @@ def draft_verification_step(case_id: str):
         if not verbatim:
             raise HTTPException(
                 status_code=400,
-                detail="Draft the Verbatim Report first (Step 1) before generating the Verification Report.",
+                detail="The Verification Report cannot be drafted unless the Verbatim Report has already been drafted. Please draft the Verbatim Report first.",
             )
 
         complaint = (
@@ -548,7 +555,25 @@ def draft_verification_step(case_id: str):
             .first()
         )
 
-        verification = _build_verification_report(case, complaint, verbatim.get("body", ""))
+        # Fetch any documents attached by the Document Processor where the phase is complaints or verification.
+        docs = db.query(Document).filter(
+            Document.case_id == case_id,
+            Document.phase.in_(["complaints", "complaint", "verification"])
+        ).all()
+
+        doc_processor_texts = []
+        for d in docs:
+            # Fetch page content for this document
+            pages = db.query(PageContent).filter(PageContent.document_id == d.id).order_by(PageContent.page_number).all()
+            doc_text = "\n".join(f"[Page {p.page_number}] {p.page_text or ''}" for p in pages if p.page_text)
+            if doc_text.strip():
+                doc_processor_texts.append(f"DOCUMENT: {d.original_name or d.file_name} (Stage: {d.phase})\n{doc_text}")
+
+        doc_processor_content = "\n\n".join(doc_processor_texts)
+
+        verification = _build_verification_report(case, complaint, verbatim.get("body", ""), doc_processor_content)
+        # Store source documents in metadata
+        verification["sourceDocuments"] = [d.original_name or d.file_name for d in docs]
 
         existing = pd.get("verificationReports", {})
         existing["verification_report"] = verification
