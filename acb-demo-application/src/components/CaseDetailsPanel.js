@@ -7,7 +7,6 @@ import CaseHeaderBand from './CaseHeaderBand';
 import PhaseTracker from './PhaseTracker';
 import PhasePanel from './PhasePanel';
 import RightRail from './RightRail';
-import DocumentList from './DocumentList';
 import CaseFlowSteps, { ComplaintsList } from './CaseFlowSteps';
 import ReportDocumentView from './ReportDocumentView';
 import DraftingProgress from './DraftingProgress';
@@ -778,7 +777,6 @@ export default function CaseDetailsPanel({ caseData, phase: pagePhase, onClose, 
                   title={`Processing Steps — ${activeDef?.label || activePhase}`}
                   compact
                 />
-                <DocumentList documents={panel.documents} reportTemplates={workflow?.reportTemplates} />
               </div>
 
               <RightRail metadata={dynamicMetadata} evidence={evidenceDisplay} audit={workflow?.transitions?.map((t) => ({
