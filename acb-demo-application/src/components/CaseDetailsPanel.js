@@ -730,16 +730,21 @@ export default function CaseDetailsPanel({ caseData, phase: pagePhase, onClose, 
                                 <button
                                   onClick={() => handleUnlinkMedia(m)}
                                   style={{
-                                    border: 'none',
-                                    background: 'transparent',
-                                    color: '#EF4444',
-                                    fontSize: '12px',
-                                    cursor: 'pointer',
-                                    padding: '0 4px',
-                                    fontWeight: 'bold',
-                                    display: 'flex',
+                                    border: '1px solid #FCA5A5',
+                                    background: '#FEE2E2',
+                                    color: '#B91C1C',
+                                    width: '18px',
+                                    height: '18px',
+                                    borderRadius: '50%',
+                                    display: 'inline-flex',
                                     alignItems: 'center',
-                                    justifyContent: 'center'
+                                    justifyContent: 'center',
+                                    fontSize: '8px',
+                                    cursor: 'pointer',
+                                    transition: 'all 0.15s ease',
+                                    fontWeight: 'bold',
+                                    lineHeight: 1,
+                                    padding: 0
                                   }}
                                   title="Unlink Audio Record"
                                 >
@@ -761,16 +766,17 @@ export default function CaseDetailsPanel({ caseData, phase: pagePhase, onClose, 
                       disabled={draftingReport || mediaRecords.length === 0}
                       style={{
                         width: '100%',
-                        padding: '8px',
-                        borderRadius: '6px',
-                        border: '1px solid #3B82F6',
-                        background: mediaRecords.length === 0 ? 'var(--surface-3)' : 'rgba(59,130,246,0.08)',
-                        color: mediaRecords.length === 0 ? 'var(--text-3)' : '#3B82F6',
-                        fontWeight: 600,
-                        fontSize: '11.5px',
+                        padding: '10px 16px',
+                        borderRadius: '8px',
+                        border: mediaRecords.length === 0 ? '1px solid #D1D5DB' : '1px solid #2563EB',
+                        background: mediaRecords.length === 0 ? '#F3F4F6' : '#2563EB',
+                        color: mediaRecords.length === 0 ? '#9CA3AF' : '#FFFFFF',
+                        fontWeight: 700,
+                        fontSize: '12px',
                         cursor: (draftingReport || mediaRecords.length === 0) ? 'not-allowed' : 'pointer',
                         transition: 'all 0.2s',
-                        textAlign: 'center'
+                        textAlign: 'center',
+                        boxShadow: mediaRecords.length === 0 ? 'none' : '0 2px 4px rgba(37, 99, 235, 0.15)',
                       }}
                     >
                       {draftingReport && draftStep === 'verbatim' ? 'Drafting Verbatim Report...' : verbatimReportDrafted ? 'Re-draft Verbatim Report' : 'Draft Verbatim Report'}
@@ -835,13 +841,21 @@ export default function CaseDetailsPanel({ caseData, phase: pagePhase, onClose, 
                               <button
                                 onClick={() => handleUnlinkReport('verbatim_report', 'Verbatim Transcript Report')}
                                 style={{
-                                  border: 'none',
-                                  background: 'transparent',
-                                  color: '#EF4444',
-                                  fontSize: '12px',
+                                  border: '1px solid #FCA5A5',
+                                  background: '#FEE2E2',
+                                  color: '#B91C1C',
+                                  width: '18px',
+                                  height: '18px',
+                                  borderRadius: '50%',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  fontSize: '8px',
                                   cursor: 'pointer',
-                                  padding: '0 4px',
-                                  fontWeight: 'bold'
+                                  transition: 'all 0.15s ease',
+                                  fontWeight: 'bold',
+                                  lineHeight: 1,
+                                  padding: 0
                                 }}
                                 title="Unlink Verbatim Report"
                               >
@@ -869,13 +883,21 @@ export default function CaseDetailsPanel({ caseData, phase: pagePhase, onClose, 
                                   <button
                                     onClick={() => handleUnlinkDocument(d)}
                                     style={{
-                                      border: 'none',
-                                      background: 'transparent',
-                                      color: '#EF4444',
-                                      fontSize: '11px',
+                                      border: '1px solid #FCA5A5',
+                                      background: '#FEE2E2',
+                                      color: '#B91C1C',
+                                      width: '18px',
+                                      height: '18px',
+                                      borderRadius: '50%',
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      fontSize: '8px',
                                       cursor: 'pointer',
-                                      padding: '0 2px',
-                                      fontWeight: 'bold'
+                                      transition: 'all 0.15s ease',
+                                      fontWeight: 'bold',
+                                      lineHeight: 1,
+                                      padding: 0
                                     }}
                                     title="Unlink Document"
                                   >
@@ -905,13 +927,21 @@ export default function CaseDetailsPanel({ caseData, phase: pagePhase, onClose, 
                                   <button
                                     onClick={() => handleUnlinkDocument(d)}
                                     style={{
-                                      border: 'none',
-                                      background: 'transparent',
-                                      color: '#EF4444',
-                                      fontSize: '11px',
+                                      border: '1px solid #FCA5A5',
+                                      background: '#FEE2E2',
+                                      color: '#B91C1C',
+                                      width: '18px',
+                                      height: '18px',
+                                      borderRadius: '50%',
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      fontSize: '8px',
                                       cursor: 'pointer',
-                                      padding: '0 2px',
-                                      fontWeight: 'bold'
+                                      transition: 'all 0.15s ease',
+                                      fontWeight: 'bold',
+                                      lineHeight: 1,
+                                      padding: 0
                                     }}
                                     title="Unlink Document"
                                   >
@@ -930,16 +960,17 @@ export default function CaseDetailsPanel({ caseData, phase: pagePhase, onClose, 
                       disabled={draftingReport || !verbatimReportDrafted}
                       style={{
                         width: '100%',
-                        padding: '8px',
-                        borderRadius: '6px',
-                        border: '1px solid #16A34A',
-                        background: !verbatimReportDrafted ? 'var(--surface-3)' : 'rgba(22,163,74,0.08)',
-                        color: !verbatimReportDrafted ? 'var(--text-3)' : '#16A34A',
-                        fontWeight: 600,
-                        fontSize: '11.5px',
+                        padding: '10px 16px',
+                        borderRadius: '8px',
+                        border: !verbatimReportDrafted ? '1px solid #D1D5DB' : '1px solid #16A34A',
+                        background: !verbatimReportDrafted ? '#F3F4F6' : '#16A34A',
+                        color: !verbatimReportDrafted ? '#9CA3AF' : '#FFFFFF',
+                        fontWeight: 700,
+                        fontSize: '12px',
                         cursor: (draftingReport || !verbatimReportDrafted) ? 'not-allowed' : 'pointer',
                         transition: 'all 0.2s',
-                        textAlign: 'center'
+                        textAlign: 'center',
+                        boxShadow: !verbatimReportDrafted ? 'none' : '0 2px 4px rgba(22, 163, 74, 0.15)',
                       }}
                       title={!verbatimReportDrafted ? 'You must draft the Verbatim Report first before you can draft the Verification Report' : ''}
                     >
