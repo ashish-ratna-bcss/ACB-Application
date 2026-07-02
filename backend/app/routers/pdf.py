@@ -947,7 +947,7 @@ def get_case_detail(case_id: str):
 def unlink_document(document_id: int):
     db: Session = SessionLocal()
     try:
-        from app.models import EvidenceItem
+        from app.models import EvidenceItem, SubDocument, SubDocumentContent
         d = db.query(Document).filter(Document.id == document_id).first()
         if not d:
             raise HTTPException(status_code=404, detail="Document not found")
@@ -956,10 +956,21 @@ def unlink_document(document_id: int):
             EvidenceItem.case_id == d.case_id,
             ((EvidenceItem.title == d.file_name) | (EvidenceItem.title == d.original_name))
         ).first()
+        
+        # Delete downstream sub-document contents & sub-documents
+        subdocs = db.query(SubDocument).filter(SubDocument.document_id == document_id).all()
+        subdoc_ids = [sd.id for sd in subdocs]
+        if subdoc_ids:
+            db.query(SubDocumentContent).filter(SubDocumentContent.subdoc_id.in_(subdoc_ids)).delete(synchronize_session=False)
+            db.query(SubDocument).filter(SubDocument.id.in_(subdoc_ids)).delete(synchronize_session=False)
+            
         if ev:
-            ev.case_id = ""
-        d.case_id = "" # unlink
+            db.delete(ev)
+        db.delete(d)
         db.commit()
         return {"ok": True}
+    except Exception as e:
+        db.rollback()
+        raise e
     finally:
         db.close()

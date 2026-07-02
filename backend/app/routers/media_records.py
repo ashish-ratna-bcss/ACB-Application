@@ -679,10 +679,13 @@ def unlink_media_record(record_id: str):
             EvidenceItem.title == r.file_name
         ).first()
         if ev:
-            ev.case_id = ""
-        r.case_id = "" # unlink
+            db.delete(ev)
+        db.delete(r)
         db.commit()
         return {"ok": True}
+    except Exception as e:
+        db.rollback()
+        raise e
     finally:
         db.close()
 
