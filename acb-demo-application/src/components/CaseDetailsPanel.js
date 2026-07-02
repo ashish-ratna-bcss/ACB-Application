@@ -21,7 +21,8 @@ const EVIDENCE_STATUS_COLOR = { logged: '#64748B', secured: '#0F7A3D', archived:
 function mapEvidence(ev) {
   const theme = EVIDENCE_THEME[ev.evidenceType] || EVIDENCE_THEME.document;
   return {
-    name: ev.title || 'Media evidence',
+    ...ev,
+    name: ev.title || ev.name || 'Media evidence',
     id: (ev.id || '').slice(0, 8).toUpperCase() || 'EVID',
     meta: `${ev.evidenceType || 'media'}${ev.createdAt ? ` · ${new Date(ev.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}` : ''}`,
     status: (ev.status || 'logged').toUpperCase(),
@@ -287,7 +288,7 @@ export default function CaseDetailsPanel({ caseData, phase: pagePhase, onClose, 
     try {
       if (ev.evidenceType === 'document') {
         const doc = caseDocs.find(
-          d => (d.file_name === ev.name || d.original_name === ev.name || d.file_name === ev.title || d.original_name === ev.title || (d.original_name && ev.name.includes(d.original_name)) || (d.file_name && ev.name.includes(d.file_name)))
+          d => (d.file_name === ev.name || d.original_name === ev.name || d.file_name === ev.title || d.original_name === ev.title)
         );
         const docIdOrName = doc ? doc.id : ev.name;
         const data = await api.getDocumentContent(caseKey, docIdOrName);
@@ -299,7 +300,7 @@ export default function CaseDetailsPanel({ caseData, phase: pagePhase, onClose, 
         });
       } else {
         const media = mediaRecords.find(
-          m => (m.file_name === ev.name || m.file_name === ev.title || (m.file_name && ev.name.includes(m.file_name)))
+          m => (m.file_name === ev.name || m.file_name === ev.title)
         );
         if (media) {
           setEvidenceContent({
@@ -311,7 +312,7 @@ export default function CaseDetailsPanel({ caseData, phase: pagePhase, onClose, 
         } else {
           const data = await api.getMediaRecords(caseKey);
           const found = data.find(
-            m => (m.file_name === ev.name || m.file_name === ev.title || (m.file_name && ev.name.includes(m.file_name)))
+            m => (m.file_name === ev.name || m.file_name === ev.title)
           );
           if (found) {
             setEvidenceContent({
