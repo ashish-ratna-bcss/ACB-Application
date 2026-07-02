@@ -290,7 +290,7 @@ export default function CaseDetailsPanel({ caseData, phase: pagePhase, onClose, 
         const doc = caseDocs.find(
           d => (d.file_name === ev.name || d.original_name === ev.name || d.file_name === ev.title || d.original_name === ev.title)
         );
-        const docIdOrName = doc ? doc.id : ev.name;
+        const docIdOrName = doc ? (doc.document_id || doc.id) : ev.name;
         const data = await api.getDocumentContent(caseKey, docIdOrName);
         setEvidenceContent({
           type: 'document',
@@ -371,7 +371,7 @@ export default function CaseDetailsPanel({ caseData, phase: pagePhase, onClose, 
     const caseIdDisplay = caseData.trackingId || caseData.id || caseKey;
     if (window.confirm(`Are you sure you want to remove the file "${fileName}" linked with case "${caseIdDisplay}"?`)) {
       try {
-        await api.unlinkDocument(d.id);
+        await api.unlinkDocument(d.document_id || d.id);
         const res = await api.getCaseDocuments(caseKey);
         setCaseDocs(Array.isArray(res?.documents) ? res.documents : []);
         const wf = await api.getCaseWorkflow(caseKey, pagePhase || undefined);
