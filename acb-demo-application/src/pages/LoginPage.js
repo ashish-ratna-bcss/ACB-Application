@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { motion } from 'framer-motion';
 import { useAuth, USERS } from '../context/AuthContext';
 
 const ROLE_LABELS = {
@@ -16,7 +15,6 @@ export default function LoginPage() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
-  const [transitioning, setTransitioning] = useState(false);
 
   const handleLogin = (e) => {
     e.preventDefault();
@@ -26,39 +24,11 @@ export default function LoginPage() {
     }
     try {
       login(username, password);
-      setTransitioning(true);
-      setTimeout(() => navigate('/'), 2500);
+      navigate('/');
     } catch {
       setError('Invalid username or password');
     }
   };
-
-  // Post-login transition: animated logo
-  if (transitioning) {
-    return (
-      <div style={{
-        position: 'fixed', inset: 0,
-        background: 'rgba(0, 0, 0, 0.6)',
-        backdropFilter: 'blur(8px)',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        perspective: '1000px',
-      }}>
-        <motion.img
-          src={`${process.env.PUBLIC_URL}/acb-logo.png`}
-          alt="ACB Logo"
-          initial={{ rotateY: -180, opacity: 0 }}
-          animate={{ rotateY: 720, opacity: 1 }}
-          exit={{ rotateY: 180, opacity: 0 }}
-          transition={{ duration: 2, ease: 'easeInOut' }}
-          style={{
-            width: '200px',
-            height: '200px',
-            objectFit: 'contain',
-          }}
-        />
-      </div>
-    );
-  }
 
   return (
     <div style={{
