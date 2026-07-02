@@ -300,25 +300,25 @@ export default function CaseDetailsPanel({ caseData, phase: pagePhase, onClose, 
         });
       } else {
         const media = mediaRecords.find(
-          m => (m.file_name === ev.name || m.file_name === ev.title)
+          m => (m.fileName === ev.name || m.fileName === ev.title)
         );
         if (media) {
           setEvidenceContent({
             type: 'audio',
             segments: media.segments || [],
-            fileName: media.file_name,
+            fileName: media.fileName,
             title: ev.name
           });
         } else {
           const data = await api.getMediaRecords(caseKey);
           const found = data.find(
-            m => (m.file_name === ev.name || m.file_name === ev.title)
+            m => (m.fileName === ev.name || m.fileName === ev.title)
           );
           if (found) {
             setEvidenceContent({
               type: 'audio',
               segments: found.segments || [],
-              fileName: found.file_name,
+              fileName: found.fileName,
               title: ev.name
             });
           } else {
@@ -357,6 +357,9 @@ export default function CaseDetailsPanel({ caseData, phase: pagePhase, onClose, 
         setHasMediaRecords(check.hasMediaRecords || false);
         const wf = await api.getCaseWorkflow(caseKey, pagePhase || undefined);
         setWorkflow(wf);
+        // Refresh evidence inventory synchronously
+        const ev = await api.getCaseEvidence(caseKey);
+        setEvidenceItems(Array.isArray(ev) ? ev : []);
       } catch (e) {
         setActionError(e.message);
       }
@@ -368,11 +371,14 @@ export default function CaseDetailsPanel({ caseData, phase: pagePhase, onClose, 
     const caseIdDisplay = caseData.trackingId || caseData.id || caseKey;
     if (window.confirm(`Are you sure you want to remove the file "${fileName}" linked with case "${caseIdDisplay}"?`)) {
       try {
-        await api.unlinkDocument(d.document_id);
+        await api.unlinkDocument(d.id);
         const res = await api.getCaseDocuments(caseKey);
         setCaseDocs(Array.isArray(res?.documents) ? res.documents : []);
         const wf = await api.getCaseWorkflow(caseKey, pagePhase || undefined);
         setWorkflow(wf);
+        // Refresh evidence inventory synchronously
+        const ev = await api.getCaseEvidence(caseKey);
+        setEvidenceItems(Array.isArray(ev) ? ev : []);
       } catch (e) {
         setActionError(e.message);
       }

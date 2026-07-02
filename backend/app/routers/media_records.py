@@ -669,9 +669,17 @@ def save_report_edits(case_id: str, payload: dict):
 def unlink_media_record(record_id: str):
     db = SessionLocal()
     try:
+        from app.models import EvidenceItem
         r = db.query(MediaRecord).filter(MediaRecord.id == record_id).first()
         if not r:
             raise HTTPException(status_code=404, detail="Media record not found")
+        # Unlink associated evidence item by title and case_id
+        ev = db.query(EvidenceItem).filter(
+            EvidenceItem.case_id == r.case_id,
+            EvidenceItem.title == r.file_name
+        ).first()
+        if ev:
+            ev.case_id = ""
         r.case_id = "" # unlink
         db.commit()
         return {"ok": True}

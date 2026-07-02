@@ -262,7 +262,10 @@ def get_document_content(case_id: str, document_id_or_name: str):
             doc_id = int(document_id_or_name)
             doc = db.query(Document).filter(Document.id == doc_id, Document.case_id == case_id).first()
         except ValueError:
-            doc = db.query(Document).filter(Document.file_name == document_id_or_name, Document.case_id == case_id).first()
+            doc = db.query(Document).filter(
+                ((Document.file_name == document_id_or_name) | (Document.original_name == document_id_or_name)),
+                Document.case_id == case_id
+            ).first()
 
         if not doc:
             raise HTTPException(status_code=404, detail="Document not found")
@@ -944,9 +947,17 @@ def get_case_detail(case_id: str):
 def unlink_document(document_id: int):
     db: Session = SessionLocal()
     try:
+        from app.models import EvidenceItem
         d = db.query(Document).filter(Document.id == document_id).first()
         if not d:
             raise HTTPException(status_code=404, detail="Document not found")
+        # Unlink associated evidence item by title and case_id
+        ev = db.query(EvidenceItem).filter(
+            EvidenceItem.case_id == d.case_id,
+            ((EvidenceItem.title == d.file_name) | (EvidenceItem.title == d.original_name))
+        ).first()
+        if ev:
+            ev.case_id = ""
         d.case_id = "" # unlink
         db.commit()
         return {"ok": True}
