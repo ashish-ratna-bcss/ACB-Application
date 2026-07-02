@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../utils/api';
 import { INDIAN_STATES, STATE_DISTRICTS, GOVERNMENT_DEPARTMENTS, GENDER_OPTIONS } from '../data';
-import CaseDetailsPanel from '../components/CaseDetailsPanel';
 
 const statusMeta = {
   draft: { label: 'Draft', color: '#64748B', bg: 'rgba(100,116,139,0.13)' },
@@ -35,7 +34,6 @@ export default function ComplaintsPage() {
   const [priority, setPriority] = useState('all');
   const [sortBy, setSortBy] = useState('newest');
   const [createOpen, setCreateOpen] = useState(false);
-  const [selectedCase, setSelectedCase] = useState(null);
   const [formError, setFormError] = useState('');
   const [newComplaint, setNewComplaint] = useState({
     complainant: '',
@@ -243,7 +241,7 @@ export default function ComplaintsPage() {
                       {c.status !== 'submitted' ? (
                         <button onClick={() => submitToVerification(c)} style={actionBtn}>Submit</button>
                       ) : (
-                        <button onClick={() => setSelectedCase({ ...c, id: c.id || c.caseId, caseId: c.caseId })} style={actionBtn}>Open</button>
+                        <button onClick={() => navigate(`/complaints/${c.caseId || c.trackingId || c.id}`)} style={actionBtn}>Open</button>
                       )}
                     </td>
                   </tr>
@@ -352,12 +350,6 @@ export default function ComplaintsPage() {
         </div>
       ) : null}
 
-      <CaseDetailsPanel
-        caseData={selectedCase}
-        phase="complaints"
-        onClose={() => setSelectedCase(null)}
-        onWorkflowChange={() => { setLoading(true); loadComplaints(); }}
-      />
     </div>
   );
 }

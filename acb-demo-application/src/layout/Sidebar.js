@@ -49,7 +49,7 @@ export default function Sidebar() {
 
   const currentPath = location.pathname;
   const pathParts = currentPath.split('/').filter(Boolean);
-  const phaseRoutes = ['verification', 'approval', 'trap', 'remand', 'investigation', 'evidence', 'court', 'prosecution'];
+  const phaseRoutes = ['verification', 'fir-approval', 'trap', 'remand', 'investigation', 'evidence', 'court', 'prosecution'];
   const activePhase = pathParts[0] && phaseRoutes.includes(pathParts[0]) ? pathParts[0] : null;
 
   const [profileOpen, setProfileOpen] = useState(false);
@@ -68,7 +68,7 @@ export default function Sidebar() {
   const phaseNav = [
     { id: 'complaints', label: 'Complaints', route: 'complaints', path: '/complaints', isComplaints: true, badge: complaintCount },
     { id: 'verification', label: 'Verification', route: 'verification' },
-    { id: 'fir', label: 'FIR / Approval', route: 'approval' },
+    { id: 'fir', label: 'FIR / Approval', route: 'approval', path: '/fir-approval' },
     { id: 'trap', label: 'Trap Operations', route: 'trap' },
     { id: 'remand', label: 'Remand', route: 'remand' },
     { id: 'investigation', label: 'Investigation', route: 'investigation' },
@@ -148,7 +148,7 @@ function NavSection({ title, items, currentPath, navigate, navIcon, navItemStyle
       <div style={{ fontSize: '10px', fontWeight: 600, letterSpacing: '1px', color: '#5A687E', textTransform: 'uppercase', padding: '6px 10px 8px' }}>{title}</div>
       {items.map((item) => {
         const path = item.path || `/${item.route}`;
-        const isActive = isPhase ? currentPath === path : currentPath === item.path;
+        const isActive = isPhase ? (currentPath === path || currentPath.startsWith(path + '/')) : currentPath === item.path;
         return (
           <button
             key={item.id}

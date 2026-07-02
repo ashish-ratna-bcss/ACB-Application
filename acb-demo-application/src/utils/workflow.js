@@ -25,7 +25,7 @@ export const PHASE_LABELS = {
 export const PHASE_ROUTES = {
   complaint: '/complaints',
   verification: '/verification',
-  approval: '/approval',
+  approval: '/fir-approval',
   trap: '/trap',
   remand: '/remand',
   investigation: '/investigation',

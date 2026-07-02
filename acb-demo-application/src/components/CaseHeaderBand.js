@@ -7,8 +7,18 @@ export default function CaseHeaderBand({ caseData }) {
     <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '12px', padding: '18px 22px', boxShadow: 'var(--shadow)', marginBottom: '16px' }}>
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '20px', flexWrap: 'wrap' }}>
         <div style={{ minWidth: 0 }}>
-          <button onClick={() => navigate('/')} style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', fontSize: '12px', fontWeight: 600, color: 'var(--text-3)', background: 'none', border: 'none', padding: 0, marginBottom: '9px', cursor: 'pointer' }}>
-            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 12H5M11 18l-6-6 6-6"></path></svg> Dashboard
+          <button
+            onClick={() => {
+              const pathParts = window.location.pathname.split('/').filter(Boolean);
+              const parentPath = pathParts.length > 1 ? `/${pathParts.slice(0, -1).join('/')}` : '/';
+              navigate(parentPath);
+            }}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', fontSize: '12px', fontWeight: 600, color: 'var(--text-3)', background: 'none', border: 'none', padding: 0, marginBottom: '9px', cursor: 'pointer' }}
+          >
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 12H5M11 18l-6-6 6-6"></path></svg>
+            {window.location.pathname.split('/').filter(Boolean)[0]
+              ? `Back to ${window.location.pathname.split('/').filter(Boolean)[0].charAt(0).toUpperCase() + window.location.pathname.split('/').filter(Boolean)[0].slice(1).replace(/-/g, ' ')}`
+              : 'Dashboard'}
           </button>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
             <span style={{ fontSize: '13px', fontWeight: 700, fontFamily: "'JetBrains Mono',monospace", color: '#fff', background: '#0E141F', padding: '4px 11px', borderRadius: '7px', letterSpacing: '0.3px' }}>{caseData.caseId}</span>

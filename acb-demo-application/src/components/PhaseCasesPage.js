@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { CaseDetailsPanel } from '../components';
+import { useNavigate } from 'react-router-dom';
 import { api } from '../utils/api';
+import { PHASE_ROUTES } from '../utils/workflow';
 
 const priorityMeta = {
   critical: { label: 'Critical', color: '#B91C1C', bg: 'rgba(220,38,38,0.12)' },
@@ -45,13 +46,13 @@ export default function PhaseCasesPage({
   primaryAction,
   detailColumnLabel = 'Officer / Detail',
 }) {
+  const navigate = useNavigate();
   const [cases, setCases] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState('all');
   const [priority, setPriority] = useState('all');
-  const [selectedCase, setSelectedCase] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 6;
 
@@ -175,7 +176,7 @@ export default function PhaseCasesPage({
                         <span style={{ display: 'inline-flex', fontSize: '11px', fontWeight: 600, borderRadius: '999px', padding: '3px 9px', color: statusTheme.color, background: statusTheme.bg }}>{item.statusLbl}</span>
                       </td>
                       <td style={{ ...td, textAlign: 'right' }}>
-                        <button onClick={() => setSelectedCase({ ...item, id: item.trackingId || item.id, caseId: item.caseId })} style={actionBtn}>Review</button>
+                        <button onClick={() => navigate(`${PHASE_ROUTES[phase]}/${item.trackingId || item.id}`)} style={actionBtn}>Review</button>
                       </td>
                     </tr>
                   );
@@ -198,13 +199,6 @@ export default function PhaseCasesPage({
           </div>
         </div>
       </section>
-
-      <CaseDetailsPanel
-        caseData={selectedCase}
-        phase={phase}
-        onClose={() => setSelectedCase(null)}
-        onWorkflowChange={loadCases}
-      />
     </div>
   );
 }

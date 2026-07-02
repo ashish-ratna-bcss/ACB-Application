@@ -15,3 +15,4 @@ export { default as SettingsPage } from './SettingsPage';
 export { default as SpeechIntelligencePage } from './SpeechIntelligencePage';
 export { default as TrapPage } from './TrapPage';
 export { default as VerificationPage } from './VerificationPage';
+export { default as CaseDetailPage } from './CaseDetailPage';

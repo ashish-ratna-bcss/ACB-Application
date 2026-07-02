@@ -139,7 +139,7 @@ export default function DashboardPage() {
             { label: 'New Complaint', path: '/complaints' },
             { label: 'Document Processor', path: '/document-processor' },
             { label: 'Speech Intelligence', path: '/speech-intelligence' },
-            { label: 'Pending Approvals', path: '/approval' },
+            { label: 'Pending Approvals', path: '/fir-approval' },
           ].map((item) => (
             <button key={item.path} onClick={() => navigate(item.path)} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '10px 12px', marginBottom: '8px', border: '1px solid var(--border)', borderRadius: '8px', background: 'var(--surface-2)', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
               {item.label}

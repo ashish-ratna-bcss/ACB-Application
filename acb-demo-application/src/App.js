@@ -17,7 +17,8 @@ import {
   EvidencePage,
   CourtPage,
   ProsecutionPage,
-  LoginPage
+  LoginPage,
+  CaseDetailPage
 } from './pages';
 import { AuthProvider } from './context/AuthContext';
 
@@ -42,14 +43,23 @@ function App() {
           <Route path="/speech-intelligence" element={<SpeechIntelligencePage />} />
           <Route path="/settings" element={<SettingsPage />} />
           <Route path="/complaints" element={<ComplaintsPage />} />
+          <Route path="/complaints/:caseId" element={<CaseDetailPage />} />
           <Route path="/verification" element={<VerificationPage />} />
-          <Route path="/approval" element={<ApprovalPage />} />
+          <Route path="/verification/:caseId" element={<CaseDetailPage />} />
+          <Route path="/fir-approval" element={<ApprovalPage />} />
+          <Route path="/fir-approval/:caseId" element={<CaseDetailPage />} />
           <Route path="/trap" element={<TrapPage />} />
+          <Route path="/trap/:caseId" element={<CaseDetailPage />} />
           <Route path="/remand" element={<RemandPage />} />
+          <Route path="/remand/:caseId" element={<CaseDetailPage />} />
           <Route path="/investigation" element={<InvestigationPage />} />
+          <Route path="/investigation/:caseId" element={<CaseDetailPage />} />
           <Route path="/evidence" element={<EvidencePage />} />
+          <Route path="/evidence/:caseId" element={<CaseDetailPage />} />
           <Route path="/court" element={<CourtPage />} />
+          <Route path="/court/:caseId" element={<CaseDetailPage />} />
           <Route path="/prosecution" element={<ProsecutionPage />} />
+          <Route path="/prosecution/:caseId" element={<CaseDetailPage />} />
           <Route path="/reports" element={<ReportsPage />} />
           <Route path="/administration" element={<AdministrationPage />} />
         </Route>
